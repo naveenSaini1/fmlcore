@@ -1,0 +1,21 @@
+{
+  "name": "fmlcore-web",
+  "version": "0.7.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "motion": "^12.23.24",
+    "next": "^15.5.6",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.1.16",
+    "postcss": "^8.5.6",
+    "tailwindcss": "4.1.16"
+  }
+}

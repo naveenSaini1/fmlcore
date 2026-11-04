@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: fmlcore
+      POSTGRES_PASSWORD: fmlcore
+      POSTGRES_DB: fmlcore
+    ports:
+      - "5433:5432"
+    volumes:
+      - fmlcore_pg:/var/lib/postgresql/data
+
+volumes:
+  fmlcore_pg:

@@ -1,0 +1,20 @@
+---
+description: FMLCore product memory — identity, stack, stages, and do-not-build rules
+alwaysApply: true
+---
+
+# FMLCore memory
+
+Read `docs/fmlcore-vision.md` before designing or building. Do not rebuild the product from chat memory.
+
+FMLCore is an 18+ Gen Z social app for unfiltered life: funny, embarrassing, painful, random. Tagline: Life is weird. You're not the only one. Relatability over likes and followers. Not Quora, Reddit, LinkedIn, or a dashboard. The weekly Top Painer leaderboard ranks posts by reactions, never people by suffering, and preserves anonymous authorship.
+
+Look: internet chaos, simple to use. Colors only as needed — lime `#C5FF41`, purple `#A875FF`, coral `#FF5C4D`, paper `#F5F0E8`, black `#171717`, white `#FFFFFF`. Thick borders, bold type, stickers, doodles. Posts look like different experiences, not identical cards.
+
+Stack: Next.js, JavaScript, Tailwind, Motion. Python FastAPI REST. PostgreSQL. WebSockets only when a live feature needs them. Mobile is its own layout (bottom nav), not a shrunk desktop.
+
+Anonymous posts hide the author publicly and keep the account internally for moderation. Safety (report, block, mute, rate limits) is in scope from the start. Not mental-health care.
+
+Stages, in order: 0 shell and design tokens, 1 auth and profile, 2 feed and posts, 3 reactions and comments, 4 explore, 5 notifications and safety, 6 profile personality and motion, 7 dynamic themes/navigation polish, 8 real-time WebSocket interactions, 9 email notifications, 10 live voice rooms. Stages 0–7 are built; stages 8–10 are planned. One stage at a time. Every interaction must really work. No fake UI.
+
+Status: Stages 0–7 built at v0.7.0 (shell/tokens, accounts/profile, feed/posts, reactions/comments, explore, notifications/safety, profile personality/motion, weekly Top Painer post leaderboard, dynamic themes/navigation polish). Stage 8 is next; stages 8–10 remain planned. Their detailed requirements and delivery phases are in `docs/PROGRESS.md`. Do not start a planned stage until the owner names it, scope is proposed, and the owner explicitly approves.
