@@ -99,6 +99,11 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup() -> None:
+    if settings.is_production and settings.jwt_secret in {
+        "dev-only-change-before-any-real-deploy",
+        "replace-with-a-long-random-secret",
+    }:
+        raise RuntimeError("JWT_SECRET must be set to a unique value in production.")
     Base.metadata.create_all(bind=engine)
     # Existing local databases predate profile customization columns.
     with engine.begin() as connection:
