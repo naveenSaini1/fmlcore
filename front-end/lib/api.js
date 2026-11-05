@@ -73,6 +73,7 @@ export function getConfessions(cursor) {
 }
 
 export function getRandomConfession() { return api("/confessions/random"); }
+export function viewConfession(id) { return api(`/confessions/${id}/view`, { method: "POST" }); }
 
 export function createConfession({ body, category, mood, isAnonymous, visibility, balloonColor }) {
   const form = new FormData();

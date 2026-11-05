@@ -120,6 +120,7 @@ def startup() -> None:
         connection.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS surface VARCHAR(20) NOT NULL DEFAULT 'feed'"))
         connection.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) NOT NULL DEFAULT 'public'"))
         connection.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS balloon_color VARCHAR(20)"))
+        connection.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS view_count INTEGER NOT NULL DEFAULT 0"))
 
 
 def current_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -692,6 +693,17 @@ def random_confession(db: Session = Depends(get_db), user: User | None = Depends
     if hidden: stmt = stmt.where(Post.author_id.not_in(hidden))
     post = db.scalars(stmt.order_by(func.random()).limit(1)).first()
     return single_post_out(db, post, user) if post else None
+
+
+@app.post("/confessions/{post_id}/view", response_model=PostOut)
+def view_confession(post_id: uuid.UUID, request: Request, db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
+    limit(request, "confession_view", max_hits=120, window_seconds=60)
+    post = db.get(Post, post_id)
+    if post is None or post.surface != "confession" or post.visibility != "public" or post.author_id in hidden_author_ids(db, user.id if user else None):
+        raise HTTPException(status_code=404, detail="That confession is gone.")
+    post.view_count += 1
+    db.commit()
+    return single_post_out(db, post, user)
 
 
 @app.get("/explore/taxonomy")
