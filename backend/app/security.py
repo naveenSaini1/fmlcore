@@ -44,7 +44,7 @@ def cookie_kwargs(token: str) -> dict:
         "value": token,
         "httponly": True,
         "samesite": "lax",
-        "secure": False,
+        "secure": settings.use_secure_cookies,
         "max_age": settings.jwt_ttl_days * 24 * 60 * 60,
         "path": "/",
     }

@@ -1,57 +1,121 @@
 # FMLCore
 
-An 18+ Gen Z social app for unfiltered life — funny, embarrassing, painful, random.
-Tagline: **Life is weird. You're not the only one.** Relatability over likes and followers.
+FMLCore is an 18+ social app for funny, embarrassing, painful, and random life
+stories. Its product rule is simple: **relatability over likes and followers**.
 
-> **Current version: 0.7.0** · Stages 0–7 built · Next: Stage 8 (real-time interactions)
+> **Current version:** 0.7.0 · Stages 0–7 are complete. See the
+> [roadmap and handoff](docs/PROGRESS.md) before planning new product work.
 
-## For anyone (human or AI) picking this up
+## What is included
 
-- **What it is / design rules:** [docs/fmlcore-vision.md](docs/fmlcore-vision.md) and [.cursor/rules/fmlcore.mdc](.cursor/rules/fmlcore.mdc)
-- **What's built, per version:** [CHANGELOG.md](CHANGELOG.md)
-- **Detailed state + where to continue:** [docs/PROGRESS.md](docs/PROGRESS.md)
-- **Future feature specifications:** [planned stages 8–11](docs/PROGRESS.md#future-feature-specifications)
+- Next.js 15 front end with the App Router, Tailwind, and Motion.
+- FastAPI and SQLAlchemy API, backed by PostgreSQL.
+- JWT sessions in HTTP-only cookies, content reporting, blocking/muting, and
+  per-IP limits for sensitive actions.
+- Posts, images, comments, reactions, explore, notifications, profiles,
+  dynamic themes, and a weekly leaderboard.
 
-**Build rule:** the product is built one numbered stage at a time. **Do not write product code for a new stage until the owner names the stage and gives an explicit "go".** Propose the scope and key decisions first, get the yes, then build, drive it end-to-end, and bump the version files.
+## Fork and run locally
 
-## Stack
+### Prerequisites
 
-- **Front-end:** Next.js (JavaScript, App Router) + Tailwind v4 + Motion
-- **Back-end:** Python FastAPI + SQLAlchemy 2.0 (REST)
-- **Data:** PostgreSQL
-- **Auth:** JWT in an httponly cookie
+- Git
+- Node.js 20+ and npm 10+
+- Python 3.10+
+- Docker Engine with the Compose plugin (recommended for PostgreSQL)
 
-## Layout
+1. Click **Fork** on GitHub, then clone your fork:
 
-```
-backend/      FastAPI app (app/), docker-compose.yml (Postgres), uploads/ (media)
-front-end/    Next.js app (app/, lib/)
-docs/         vision + progress
-image/        icons
-CHANGELOG.md  build log by version
-VERSION       current version string
-```
-
-## Run it (dev)
-
-1. **Postgres** — from `backend/`: `docker compose up -d` (listens on host port **5433**, per `docker-compose.yml`). Any Postgres matching `backend/.env` works.
-2. **Back-end** — from `backend/`:
    ```bash
+   git clone https://github.com/YOUR_GITHUB_USERNAME/fmlcore.git
+   cd fmlcore
+   ```
+
+2. Create local configuration files. These stay untracked:
+
+   ```bash
+   cp backend/.env.example backend/.env
+   cp front-end/.env.example front-end/.env.local
+   ```
+
+   Set a unique `JWT_SECRET` in `backend/.env` even for a shared development
+   environment. Keep `APP_ENV=development` and `COOKIE_SECURE=false` locally.
+
+3. Start PostgreSQL:
+
+   ```bash
+   cd backend
+   docker compose up -d
+   ```
+
+   The development database listens on `localhost:5433`. Its credentials are
+   intentionally local-only defaults; never reuse them in a deployed system.
+
+4. In a second terminal, start the API:
+
+   ```bash
+   cd backend
    python3 -m venv .venv
    .venv/bin/pip install -r requirements.txt
-   .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+   .venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
    ```
-   Tables are auto-created on startup (no migration tool). API docs at `http://127.0.0.1:8000/docs`.
-3. **Front-end** — from `front-end/`: `npm install && npm run dev`
-4. Open **http://localhost:3000**
 
-### Dev notes (important)
+5. In a third terminal, start the web app:
 
-- **Same-origin API proxy:** the browser calls `/api/*`, which `front-end/next.config.mjs` rewrites to `http://127.0.0.1:8000/*`. This keeps the session cookie first-party, so **login persists from either `localhost` or `127.0.0.1`.** `front-end/.env.local` sets `NEXT_PUBLIC_API_URL=/api`.
-- **Tailwind is pinned to `4.1.16`.** Do not let it drift to 4.3.x — that pulls the ESM-only `magic-string@1.x`, which crashes Next 15's require-hook and 500s every page.
-- Google Fonts are fetched at build; offline they fall back with a harmless warning.
-- **Dev test account** (local DB only): `runtest_1793786793@example.com` / `supersecret8`.
+   ```bash
+   cd front-end
+   npm ci
+   npm run dev
+   ```
+
+   Open [http://localhost:3000](http://localhost:3000). API documentation is
+   available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) and
+   the liveness endpoint is `GET /health`.
+
+### Local troubleshooting
+
+- `docker compose` must be installed as a Docker plugin. If it is unavailable,
+  point `DATABASE_URL` at any PostgreSQL 16-compatible database instead.
+- Browser requests use `/api/*`; Next.js proxies them to `API_ORIGIN` (default
+  `http://127.0.0.1:8000`). Do not set `NEXT_PUBLIC_API_URL` to a different
+  origin unless you have also planned cookie/CORS behavior deliberately.
+- Tailwind is pinned to `4.1.16`. Do not update it casually: later versions can
+  conflict with Next 15's require hook.
+
+## Deploying
+
+The repository includes production Dockerfiles and a self-hosted Compose
+configuration. Follow [the deployment guide](docs/DEPLOYMENT.md) before making
+the app public. It covers HTTPS, production secrets, persistent volumes,
+backups, verification, and the current database-migration limitation.
+
+## Verification
+
+Run these before opening a pull request:
+
+```bash
+cd front-end && npm ci && npm run build
+cd ../backend && .venv/bin/python -m compileall -q app
+```
+
+GitHub Actions performs the same build and Python syntax checks for every push
+and pull request. The project does not yet have an automated integration-test
+suite, so manually check signup, login, creating a post, reacting, commenting,
+and image upload when those areas change.
+
+## Contributing and maintenance
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for the branch, review, release, and
+maintenance workflow. Report vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md); do not include secrets, user data, or reproduction
+details in public issues.
+
+Product direction and the strict one-stage-at-a-time rule live in
+[docs/fmlcore-vision.md](docs/fmlcore-vision.md) and
+[docs/PROGRESS.md](docs/PROGRESS.md). The build log is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Versioning
 
-`0.<stage>.<patch>` — the minor tracks the completed build stage.
+Versions use `0.<stage>.<patch>`: the minor number tracks a completed product
+stage. Update `VERSION`, `CHANGELOG.md`, the FastAPI version, the front-end
+package version, and `docs/PROGRESS.md` together when shipping a stage.
