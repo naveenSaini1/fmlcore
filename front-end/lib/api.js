@@ -68,6 +68,19 @@ export function getFeed(cursor) {
   return api(`/posts${query}`);
 }
 
+export function getConfessions(cursor) {
+  return api(`/confessions${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
+}
+
+export function getRandomConfession() { return api("/confessions/random"); }
+
+export function createConfession({ body, category, mood, isAnonymous, visibility, balloonColor }) {
+  const form = new FormData();
+  form.append("body", body); form.append("category", category); form.append("mood", mood);
+  form.append("is_anonymous", String(isAnonymous)); form.append("visibility", visibility); form.append("balloon_color", balloonColor);
+  return api("/confessions", { method: "POST", body: form });
+}
+
 function exploreQuery({ category, mood, cursor } = {}) {
   const params = new URLSearchParams();
   if (category) params.set("category", category);

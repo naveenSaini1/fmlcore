@@ -74,10 +74,11 @@ POSTS_DIR = UPLOAD_DIR / "posts"
 MAX_AVATAR_BYTES = 2_000_000
 MAX_POST_IMAGE_BYTES = 2_000_000
 MAX_POST_BODY = 1000
+BALLOON_COLORS = {"pink", "purple", "lime", "coral", "blue", "yellow", "orange", "mint", "lavender"}
 AVATAR_DIR.mkdir(parents=True, exist_ok=True)
 POSTS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="FMLCore", version="0.7.0")
+app = FastAPI(title="FMLCore", version="0.8.0")
 
 DAILY_PROMPTS = [
     "What's the plot twist today?",
@@ -116,6 +117,9 @@ def startup() -> None:
         connection.execute(text(
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(30) NOT NULL DEFAULT 'system'"
         ))
+        connection.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS surface VARCHAR(20) NOT NULL DEFAULT 'feed'"))
+        connection.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) NOT NULL DEFAULT 'public'"))
+        connection.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS balloon_color VARCHAR(20)"))
 
 
 def current_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -599,6 +603,7 @@ def list_posts(
     stmt = (
         select(Post)
         .options(joinedload(Post.author))
+        .where(Post.surface == "feed", Post.visibility == "public")
         .order_by(Post.created_at.desc(), Post.id.desc())
         .limit(size + 1)
     )
@@ -649,6 +654,44 @@ def list_posts(
         for p in rows
     ]
     return FeedOut(posts=posts, next_cursor=next_cursor)
+
+
+@app.post("/confessions", response_model=PostOut)
+def create_confession(
+    request: Request, body: str = Form(...), category: str = Form(...), mood: str = Form(...),
+    balloon_color: str = Form("pink"), is_anonymous: bool = Form(True), visibility: str = Form("public"),
+    db: Session = Depends(get_db), user: User = Depends(current_user),
+):
+    limit(request, "confession", max_hits=12, window_seconds=600)
+    content = body.strip()
+    if not 1 <= len(content) <= MAX_POST_BODY: raise HTTPException(status_code=422, detail=f"A confession is 1 to {MAX_POST_BODY} characters.")
+    if category not in CATEGORY_SET or mood not in MOOD_SET: raise HTTPException(status_code=422, detail="Choose a valid category and mood.")
+    if balloon_color not in BALLOON_COLORS: raise HTTPException(status_code=422, detail="Choose an available balloon colour.")
+    if visibility not in {"public", "private"}: raise HTTPException(status_code=422, detail="Choose public or private visibility.")
+    post = Post(id=uuid.uuid4(), author_id=user.id, body=content, category=category, mood=mood, is_anonymous=is_anonymous, surface="confession", visibility=visibility, balloon_color=balloon_color)
+    db.add(post); db.commit(); db.refresh(post)
+    return single_post_out(db, post, user)
+
+
+@app.get("/confessions", response_model=FeedOut)
+def list_confessions(cursor: str | None = None, limit: int = 24, db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
+    size = max(1, min(limit, 48)); hidden = hidden_author_ids(db, user.id if user else None)
+    stmt = select(Post).options(joinedload(Post.author)).where(Post.surface == "confession", Post.visibility == "public").order_by(Post.created_at.desc(), Post.id.desc()).limit(size + 1)
+    if hidden: stmt = stmt.where(Post.author_id.not_in(hidden))
+    if cursor:
+        try: before_value, _, before_id = cursor.partition("|"); before = datetime.fromisoformat(before_value); stmt = stmt.where((Post.created_at < before) | ((Post.created_at == before) & (Post.id < uuid.UUID(before_id))))
+        except ValueError: raise HTTPException(status_code=400, detail="Bad cursor.")
+    rows = db.scalars(stmt).all(); has_more = len(rows) > size; rows = rows[:size]; ids = [p.id for p in rows]
+    return FeedOut(posts=[post_to_public(p, reaction_counts_for(db, ids).get(p.id, {}), my_reactions_for(db, user.id if user else None, ids).get(p.id), comment_counts_for(db, ids).get(p.id, 0)) for p in rows], next_cursor=f"{rows[-1].created_at.isoformat()}|{rows[-1].id}" if has_more and rows else None)
+
+
+@app.get("/confessions/random", response_model=PostOut | None)
+def random_confession(db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
+    stmt = select(Post).options(joinedload(Post.author)).where(Post.surface == "confession", Post.visibility == "public")
+    hidden = hidden_author_ids(db, user.id if user else None)
+    if hidden: stmt = stmt.where(Post.author_id.not_in(hidden))
+    post = db.scalars(stmt.order_by(func.random()).limit(1)).first()
+    return single_post_out(db, post, user) if post else None
 
 
 @app.get("/explore/taxonomy")

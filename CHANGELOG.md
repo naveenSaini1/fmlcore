@@ -3,6 +3,13 @@
 All notable changes to FMLCore. Versions track build stages as `0.<stage>.<patch>`.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.8.0] — 2026-11-05 — Stage 8: The Confession Sky
+
+### Added
+- A dedicated `/confessions` floating-balloon experience with independent CSS motion, glossy balloon bodies, paper tags, responsive density, and reduced-motion support.
+- Real public/private confession records backed by the existing post, reaction, comment, safety, and moderation infrastructure.
+- Confession composer with colour choice, anonymous/private controls, random discovery, progressive loading, and a selected-confession detail panel.
+
 ## [0.7.0] — 2026-11-04 — Stage 7: themes + navigation polish
 
 ### Added

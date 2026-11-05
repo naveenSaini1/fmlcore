@@ -45,6 +45,9 @@ class Post(Base):
     mood: Mapped[str] = mapped_column(String(40))
     image_file: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_anonymous: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    surface: Mapped[str] = mapped_column(String(20), default="feed", server_default="feed", index=True)
+    visibility: Mapped[str] = mapped_column(String(20), default="public", server_default="public", index=True)
+    balloon_color: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )

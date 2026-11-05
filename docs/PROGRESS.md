@@ -1,6 +1,6 @@
 # FMLCore — build progress & handoff
 
-**Version:** 0.7.0 · **Last stage done:** 7 (dynamic themes + navigation polish) · **Next:** Stage 8 (real-time interactions)
+**Version:** 0.8.0 · **Last stage done:** 8 (The Confession Sky) · **Next:** Stage 9 (real-time interactions)
 
 This file is the pick-up point for anyone (human or AI) continuing the build. Read
 [fmlcore-vision.md](fmlcore-vision.md) for product intent and [../CHANGELOG.md](../CHANGELOG.md)
@@ -27,10 +27,11 @@ owner names the stage and gives an explicit "go". The flow each time:
 - [x] **5 — Notifications + safety.** Notifications, block, mute, report, moderation-ready reports, and rate-limit coverage.
 - [x] **6 — Profile personality & motion.** Profile colors and stickers, reduced-motion-aware animation, and weekly Top Painer post leaderboard (anonymous posts remain anonymous).
 - [x] **7 — Dynamic themes + navigation polish.** Five site-wide palettes plus a system preference, saved per account, animated active routes, and accessible button feedback.
-- [ ] **8 — Real-time interactions.** WebSocket updates for reactions, comments, and instant in-app notifications. *(planned; not started)*
-- [ ] **9 — Email notifications.** Send real emails for reactions and comments on a user's posts. *(planned; not started)*
-- **10 — Voice rooms.** Folded into Stage 11; no separate Stage 10 build.
-- [ ] **11 — Voice rooms + full voice meeting rooms.** Includes the social audio rooms and full meeting-room experience. *(future; deferred for now)*
+- [x] **8 — The Confession Sky.** Animated public confession balloons, private visibility, creation, discovery, reactions, comments, and safety reuse.
+- [ ] **9 — Real-time interactions.** WebSocket updates for reactions, comments, and instant in-app notifications. *(planned; not started)*
+- [ ] **10 — Email notifications.** Send real emails for reactions and comments on a user's posts. *(planned; not started)*
+- **11 — Voice rooms.** Folded into Stage 12; no separate Stage 11 build.
+- [ ] **12 — Voice rooms + full voice meeting rooms.** Includes the social audio rooms and full meeting-room experience. *(future; deferred for now)*
 
 ## Back-end (FastAPI — `backend/app`)
 
@@ -70,7 +71,7 @@ owner names the stage and gives an explicit "go". The flow each time:
 
 ## Where to continue
 
-Stages 0–7 are complete. Stage 8 (real-time interactions) is next. Stage 10's voice-room scope is folded into deferred Stage 11. Propose the scope and decisions first and wait for the owner's explicit go before writing product code.
+Stages 0–8 are complete. Stage 9 (real-time interactions) is next. Stage 11's voice-room scope is folded into deferred Stage 12. Propose the scope and decisions first and wait for the owner's explicit go before writing product code.
 
 ## Completed Stage 7 specification
 
@@ -102,35 +103,35 @@ Stage 7 is delivered in v0.7.0. The specification below records the completed sc
 
 These requirements record the remaining roadmap. Follow the stage approval rule above before starting each stage.
 
-### Stage 8 — Real-time interaction system
+### Stage 9 — Real-time interaction system
 
 Implement authenticated WebSocket connections for new comments, replies, reaction-count updates, and notifications. Define event support for room participant updates and voice-room activity when Stage 11 adds rooms.
 
 Requirements: authorize every event, handle reconnection, prevent duplicate events, persist notifications reliably, manage connections efficiently, and provide a graceful fallback so the app remains usable while disconnected.
 
-### Stage 9 — Email notification system
+### Stage 10 — Email notification system
 
 Send transactional and activity email for reactions, comments, replies, mentions, and important account/security events.
 
 Requirements: branded HTML templates; user notification preferences; email verification; unsubscribe for non-essential messages; batching; rate limits; retries for failed delivery; and safeguards against repeated or excessive activity emails.
 
-### Stage 10 — Folded into Stage 11
+### Stage 11 — Folded into Stage 12
 
-Stage 10 no longer has a separate delivery. Its social voice-room scope is included in the deferred Stage 11 plan below.
+Stage 11 no longer has a separate delivery. Its social voice-room scope is included in the deferred Stage 12 plan below.
 
-### Stage 11 — Voice rooms + full voice meeting rooms
+### Stage 12 — Voice rooms + full voice meeting rooms
 
 Build a dedicated social audio experience where people can browse public rooms, create or join rooms, listen, request permission to speak, mute/unmute, raise a hand, view participants, and leave. The later full meeting-room experience is part of this same stage; its additional requirements will be scoped when the stage is scheduled.
 
 Room setup includes a name, description, topic/category, public/private visibility, participant limit, and host/moderator roles. Initial categories: 2 AM Thoughts, Relationship Chaos, College Confessions, Work Is Killing Me, Just Vibing, and Unfiltered Conversations.
 
-Technical and safety requirements: WebRTC audio with an SFU such as LiveKit or mediasoup (choose during Stage 11 planning); authenticated room access; microphone permissions; participant management; network-disconnect handling; host moderation; reporting and blocking; room closure and participant removal. Design for privacy and safety. Do not record audio by default.
+Technical and safety requirements: WebRTC audio with an SFU such as LiveKit or mediasoup (choose during Stage 12 planning); authenticated room access; microphone permissions; participant management; network-disconnect handling; host moderation; reporting and blocking; room closure and participant removal. Design for privacy and safety. Do not record audio by default.
 
-This entire stage is deferred for now; propose and approve its detailed product and technical scope when Stage 11 is scheduled.
+This entire stage is deferred for now; propose and approve its detailed product and technical scope when Stage 12 is scheduled.
 
 ### Delivery phases
 
 1. **Phase 1 — Complete:** Dynamic themes, navigation indicators, button interactions, and integration with the core social features already built.
 2. **Phase 2 — Planned:** WebSocket updates and real-time notifications, then email notifications.
-3. **Phase 3 — Planned, deferred:** Stage 11 social voice rooms, full meeting rooms, WebRTC/SFU integration, room management, and moderation.
+3. **Phase 3 — Planned, deferred:** Stage 12 social voice rooms, full meeting rooms, WebRTC/SFU integration, room management, and moderation.
 4. **Phase 4 — Planned:** Advanced community experiences; scope to be proposed later.

@@ -116,6 +116,9 @@ class PostOut(BaseModel):
     mood: str
     image_url: str | None
     is_anonymous: bool
+    surface: str = "feed"
+    visibility: str = "public"
+    balloon_color: str | None = None
     author: AuthorOut | None
     reactions: dict[str, int] = {}
     reaction_count: int = 0
