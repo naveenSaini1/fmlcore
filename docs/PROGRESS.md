@@ -29,8 +29,8 @@ owner names the stage and gives an explicit "go". The flow each time:
 - [x] **7 — Dynamic themes + navigation polish.** Five site-wide palettes plus a system preference, saved per account, animated active routes, and accessible button feedback.
 - [ ] **8 — Real-time interactions.** WebSocket updates for reactions, comments, and instant in-app notifications. *(planned; not started)*
 - [ ] **9 — Email notifications.** Send real emails for reactions and comments on a user's posts. *(planned; not started)*
-- [ ] **10 — Voice rooms.** Create and join live voice rooms. *(planned; not started)*
-- [ ] **11 — Full voice meeting rooms.** Later expansion; detailed scope to be proposed when this stage is scheduled. *(future; skipped for now)*
+- **10 — Voice rooms.** Folded into Stage 11; no separate Stage 10 build.
+- [ ] **11 — Voice rooms + full voice meeting rooms.** Includes the social audio rooms and full meeting-room experience. *(future; deferred for now)*
 
 ## Back-end (FastAPI — `backend/app`)
 
@@ -70,7 +70,7 @@ owner names the stage and gives an explicit "go". The flow each time:
 
 ## Where to continue
 
-Stages 0–7 are complete. Stage 8 (real-time interactions) is next. Stages 8–11 remain planned; propose the scope and decisions first and wait for the owner's explicit go before writing product code.
+Stages 0–7 are complete. Stage 8 (real-time interactions) is next. Stage 10's voice-room scope is folded into deferred Stage 11. Propose the scope and decisions first and wait for the owner's explicit go before writing product code.
 
 ## Completed Stage 7 specification
 
@@ -104,7 +104,7 @@ These requirements record the remaining roadmap. Follow the stage approval rule 
 
 ### Stage 8 — Real-time interaction system
 
-Implement authenticated WebSocket connections for new comments, replies, reaction-count updates, and notifications. Define event support for room participant updates and voice-room activity when Stage 10 adds rooms.
+Implement authenticated WebSocket connections for new comments, replies, reaction-count updates, and notifications. Define event support for room participant updates and voice-room activity when Stage 11 adds rooms.
 
 Requirements: authorize every event, handle reconnection, prevent duplicate events, persist notifications reliably, manage connections efficiently, and provide a graceful fallback so the app remains usable while disconnected.
 
@@ -114,21 +114,23 @@ Send transactional and activity email for reactions, comments, replies, mentions
 
 Requirements: branded HTML templates; user notification preferences; email verification; unsubscribe for non-essential messages; batching; rate limits; retries for failed delivery; and safeguards against repeated or excessive activity emails.
 
-### Stage 10 — Voice rooms: The Chaos Room
+### Stage 10 — Folded into Stage 11
 
-Build a dedicated social audio experience where people can browse public rooms, create or join rooms, listen, request permission to speak, mute/unmute, raise a hand, view participants, and leave.
+Stage 10 no longer has a separate delivery. Its social voice-room scope is included in the deferred Stage 11 plan below.
+
+### Stage 11 — Voice rooms + full voice meeting rooms
+
+Build a dedicated social audio experience where people can browse public rooms, create or join rooms, listen, request permission to speak, mute/unmute, raise a hand, view participants, and leave. The later full meeting-room experience is part of this same stage; its additional requirements will be scoped when the stage is scheduled.
 
 Room setup includes a name, description, topic/category, public/private visibility, participant limit, and host/moderator roles. Initial categories: 2 AM Thoughts, Relationship Chaos, College Confessions, Work Is Killing Me, Just Vibing, and Unfiltered Conversations.
 
-Technical and safety requirements: WebRTC audio with an SFU such as LiveKit or mediasoup (choose during Stage 10 planning); authenticated room access; microphone permissions; participant management; network-disconnect handling; host moderation; reporting and blocking; room closure and participant removal. Design for privacy and safety. Do not record audio by default.
+Technical and safety requirements: WebRTC audio with an SFU such as LiveKit or mediasoup (choose during Stage 11 planning); authenticated room access; microphone permissions; participant management; network-disconnect handling; host moderation; reporting and blocking; room closure and participant removal. Design for privacy and safety. Do not record audio by default.
 
-### Stage 11 — Full voice meeting rooms
-
-Reserved for a later, fuller voice meeting-room experience beyond the initial social audio rooms. Keep skipped for now; propose and approve its detailed product and technical scope when Stage 11 is scheduled.
+This entire stage is deferred for now; propose and approve its detailed product and technical scope when Stage 11 is scheduled.
 
 ### Delivery phases
 
 1. **Phase 1 — Complete:** Dynamic themes, navigation indicators, button interactions, and integration with the core social features already built.
 2. **Phase 2 — Planned:** WebSocket updates and real-time notifications, then email notifications.
-3. **Phase 3 — Planned:** Voice rooms, WebRTC/SFU integration, room management, and moderation.
-4. **Phase 4 — Planned:** Stage 11 full voice meeting rooms and other advanced community experiences; scope to be proposed later.
+3. **Phase 3 — Planned, deferred:** Stage 11 social voice rooms, full meeting rooms, WebRTC/SFU integration, room management, and moderation.
+4. **Phase 4 — Planned:** Advanced community experiences; scope to be proposed later.
