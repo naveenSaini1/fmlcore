@@ -13,7 +13,8 @@ const EMPTY_SKY = ["pink", "blue", "lavender", "mint", "yellow", "coral", "purpl
 
 function Balloon({ post, index, onPick, selected, onPop }) {
   const [popped, setPopped] = useState(false);
-  const style = { "--x": `${6 + ((index * 17) % 86)}%`, "--delay": `${-(index * 1.37) % 18}s`, "--duration": `${15 + (index % 7) * 2}s`, "--size": `${.72 + (index % 4) * .12}` };
+  const duration = 18 + (index % 6) * 2;
+  const style = { "--x": `${6 + ((index * 17) % 86)}%`, "--delay": `${-((index % 18) / 18) * duration}s`, "--duration": `${duration}s`, "--size": `${.72 + (index % 4) * .12}` };
   return <button type="button" aria-label={post.body ? `Pop confession: ${post.body.slice(0, 60)}` : "Release the first confession"} onClick={async () => { if (!post.id) return onPick?.(post); if (popped) return; setPopped(true); try { const viewed = await viewConfession(post.id); onPop?.(viewed); setTimeout(() => onPick?.(viewed), 320); } catch { setPopped(false); } }} className={`sky-balloon ${selected ? "is-selected" : ""} ${popped ? "is-popping" : ""}`} style={style}>
     <span className={`balloon-body balloon-${post.balloon_color || "pink"}`}><i /></span><span className="balloon-knot" /><span className="balloon-string" /><span className="balloon-tag">{post.category.slice(0, 2).toUpperCase()}<small>{post.view_count || 0} views</small></span>
   </button>;
