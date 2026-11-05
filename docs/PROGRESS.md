@@ -30,6 +30,7 @@ owner names the stage and gives an explicit "go". The flow each time:
 - [ ] **8 — Real-time interactions.** WebSocket updates for reactions, comments, and instant in-app notifications. *(planned; not started)*
 - [ ] **9 — Email notifications.** Send real emails for reactions and comments on a user's posts. *(planned; not started)*
 - [ ] **10 — Voice rooms.** Create and join live voice rooms. *(planned; not started)*
+- [ ] **11 — Full voice meeting rooms.** Later expansion; detailed scope to be proposed when this stage is scheduled. *(future; skipped for now)*
 
 ## Back-end (FastAPI — `backend/app`)
 
@@ -69,7 +70,7 @@ owner names the stage and gives an explicit "go". The flow each time:
 
 ## Where to continue
 
-Stages 0–7 are complete. Stage 8 (real-time interactions) is next. Stages 8–10 remain planned; propose the scope and decisions first and wait for the owner's explicit go before writing product code.
+Stages 0–7 are complete. Stage 8 (real-time interactions) is next. Stages 8–11 remain planned; propose the scope and decisions first and wait for the owner's explicit go before writing product code.
 
 ## Completed Stage 7 specification
 
@@ -121,9 +122,13 @@ Room setup includes a name, description, topic/category, public/private visibili
 
 Technical and safety requirements: WebRTC audio with an SFU such as LiveKit or mediasoup (choose during Stage 10 planning); authenticated room access; microphone permissions; participant management; network-disconnect handling; host moderation; reporting and blocking; room closure and participant removal. Design for privacy and safety. Do not record audio by default.
 
+### Stage 11 — Full voice meeting rooms
+
+Reserved for a later, fuller voice meeting-room experience beyond the initial social audio rooms. Keep skipped for now; propose and approve its detailed product and technical scope when Stage 11 is scheduled.
+
 ### Delivery phases
 
 1. **Phase 1 — Complete:** Dynamic themes, navigation indicators, button interactions, and integration with the core social features already built.
 2. **Phase 2 — Planned:** WebSocket updates and real-time notifications, then email notifications.
 3. **Phase 3 — Planned:** Voice rooms, WebRTC/SFU integration, room management, and moderation.
-4. **Phase 4:** Advanced community experiences; scope to be proposed later.
+4. **Phase 4 — Planned:** Stage 11 full voice meeting rooms and other advanced community experiences; scope to be proposed later.

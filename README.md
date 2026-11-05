@@ -10,7 +10,7 @@ Tagline: **Life is weird. You're not the only one.** Relatability over likes and
 - **What it is / design rules:** [docs/fmlcore-vision.md](docs/fmlcore-vision.md) and [.cursor/rules/fmlcore.mdc](.cursor/rules/fmlcore.mdc)
 - **What's built, per version:** [CHANGELOG.md](CHANGELOG.md)
 - **Detailed state + where to continue:** [docs/PROGRESS.md](docs/PROGRESS.md)
-- **Future feature specifications:** [planned stages 8–10](docs/PROGRESS.md#future-feature-specifications)
+- **Future feature specifications:** [planned stages 8–11](docs/PROGRESS.md#future-feature-specifications)
 
 **Build rule:** the product is built one numbered stage at a time. **Do not write product code for a new stage until the owner names the stage and gives an explicit "go".** Propose the scope and key decisions first, get the yes, then build, drive it end-to-end, and bump the version files.
 

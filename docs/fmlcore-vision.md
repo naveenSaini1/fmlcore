@@ -122,6 +122,7 @@ Do one stage at a time. Wait for an explicit yes and a stage number before writi
 8. Real-time reactions, comments, and in-app notifications via WebSockets.
 9. Email notifications for reactions and comments on a user's posts.
 10. Live voice rooms that people can create and join.
+11. Full voice meeting rooms (future stage; skipped for now).
 
 Later: milestones and richer customization.
 
@@ -131,6 +132,6 @@ Current version 0.7.0 — see `CHANGELOG.md`.
 
 Stages 0 (shell and tokens), 1 (accounts and profile), 2 (feed and posts), and 3 (reactions and comments) are built, running, and verified end to end. `image/` holds the icons.
 
-Stages 0–7 are complete. Stage 8 is next; stages 8–10 remain planned. See `docs/PROGRESS.md` for the roadmap and handoff state.
+Stages 0–7 are complete. Stage 8 is next; stages 8–11 remain planned. See `docs/PROGRESS.md` for the roadmap and handoff state.
 
-The completed Stage 7 requirements and planned requirements for real-time WebSockets (Stage 8), email notifications (Stage 9), voice rooms (Stage 10), and delivery phases are recorded in `docs/PROGRESS.md`. Obtain explicit approval for each remaining stage before implementation.
+The completed Stage 7 requirements and planned requirements for real-time WebSockets (Stage 8), email notifications (Stage 9), social voice rooms (Stage 10), full voice meeting rooms (Stage 11), and delivery phases are recorded in `docs/PROGRESS.md`. Obtain explicit approval for each remaining stage before implementation.
