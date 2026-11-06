@@ -50,16 +50,17 @@ def post_to_public(
     )
 
 
-def comment_to_public(comment: Comment, replies: list[Comment] | None = None) -> CommentOut:
+def comment_to_public(comment: Comment, replies: list[Comment] | None = None, viewer_id: UUID | None = None) -> CommentOut:
     author = None if comment.is_anonymous else _author_out(comment.author)
     return CommentOut(
         id=comment.id,
         body=comment.body,
         is_anonymous=comment.is_anonymous,
+        is_mine=viewer_id is not None and comment.author_id == viewer_id,
         author=author,
         parent_id=comment.parent_id,
         created_at=comment.created_at,
-        replies=[comment_to_public(r) for r in (replies or [])],
+        replies=[comment_to_public(r, viewer_id=viewer_id) for r in (replies or [])],
     )
 
 

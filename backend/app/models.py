@@ -5,6 +5,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -137,3 +138,32 @@ class Report(Base):
     details: Mapped[str] = mapped_column(String(500), default="", server_default="")
     status: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class HistoryBase(Base):
+    __abstract__ = True
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    original_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    deleted_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class PostHistory(HistoryBase):
+    __tablename__ = "posts_history"
+
+
+class CommentHistory(HistoryBase):
+    __tablename__ = "comments_history"
+
+
+class ReactionHistory(HistoryBase):
+    __tablename__ = "reactions_history"
+
+
+class NotificationHistory(HistoryBase):
+    __tablename__ = "notifications_history"
+
+
+class ReportHistory(HistoryBase):
+    __tablename__ = "reports_history"

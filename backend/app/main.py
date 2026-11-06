@@ -13,7 +13,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -21,11 +21,16 @@ from app.config import UPLOAD_DIR, settings
 from app.db import Base, engine, get_db
 from app.limiter import limit
 from app.models import (
+    CommentHistory,
     Comment,
     Notification,
+    NotificationHistory,
     Post,
+    PostHistory,
     Reaction,
+    ReactionHistory,
     Report,
+    ReportHistory,
     User,
     UserBlock,
     UserMute,
@@ -77,6 +82,17 @@ MAX_POST_BODY = 1000
 BALLOON_COLORS = {"pink", "purple", "lime", "coral", "blue", "yellow", "orange", "mint", "lavender"}
 AVATAR_DIR.mkdir(parents=True, exist_ok=True)
 POSTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def archive_records(db: Session, history_model, rows: list, deleted_by: uuid.UUID) -> None:
+    for row in rows:
+        snapshot = {}
+        for column in row.__table__.columns:
+            value = getattr(row, column.name)
+            if isinstance(value, (uuid.UUID, datetime, date)):
+                value = value.isoformat() if isinstance(value, (datetime, date)) else str(value)
+            snapshot[column.name] = value
+        db.add(history_model(original_id=row.id, snapshot=snapshot, deleted_by=deleted_by))
 
 app = FastAPI(title="FMLCore", version="0.8.0")
 
@@ -471,6 +487,21 @@ def submit_report(
     return {"ok": True, "status": report.status}
 
 
+@app.get("/safety/reports/mine")
+def list_my_reported_posts(db: Session = Depends(get_db), user: User = Depends(current_user)) -> dict:
+    rows = db.execute(
+        select(Report, Post)
+        .join(Post, Report.target_id == Post.id)
+        .where(Report.reporter_id == user.id, Report.target_type == "post")
+        .order_by(Report.created_at.desc())
+        .limit(50)
+    ).all()
+    return {"reports": [{"id": str(report.id), "status": report.status, "reason": report.reason,
+        "reported_at": report.created_at.isoformat(), "post": {"id": str(post.id), "body": post.body,
+        "category": post.category, "mood": post.mood, "is_anonymous": post.is_anonymous,
+        "created_at": post.created_at.isoformat()}} for report, post in rows]}
+
+
 @app.patch("/profile", response_model=UserOut)
 def update_profile(
     body: ProfileIn,
@@ -686,6 +717,16 @@ def list_confessions(cursor: str | None = None, limit: int = 24, db: Session = D
     return FeedOut(posts=[post_to_public(p, reaction_counts_for(db, ids).get(p.id, {}), my_reactions_for(db, user.id if user else None, ids).get(p.id), comment_counts_for(db, ids).get(p.id, 0)) for p in rows], next_cursor=f"{rows[-1].created_at.isoformat()}|{rows[-1].id}" if has_more and rows else None)
 
 
+@app.get("/me/posts", response_model=FeedOut)
+def my_posts(surface: str = "feed", limit: int = 30, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if surface not in {"feed", "confession"}:
+        raise HTTPException(status_code=422, detail="Choose feed or confession posts.")
+    size = max(1, min(limit, 50))
+    rows = db.scalars(select(Post).options(joinedload(Post.author)).where(Post.author_id == user.id, Post.surface == surface).order_by(Post.created_at.desc(), Post.id.desc()).limit(size)).all()
+    ids = [p.id for p in rows]
+    return FeedOut(posts=[post_to_public(p, reaction_counts_for(db, ids).get(p.id, {}), my_reactions_for(db, user.id, ids).get(p.id), comment_counts_for(db, ids).get(p.id, 0)) for p in rows], next_cursor=None)
+
+
 @app.get("/confessions/random", response_model=PostOut | None)
 def random_confession(db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
     stmt = select(Post).options(joinedload(Post.author)).where(Post.surface == "confession", Post.visibility == "public")
@@ -861,6 +902,42 @@ def get_post(
     return single_post_out(db, post, user)
 
 
+@app.delete("/posts/{post_id}")
+def delete_post(post_id: uuid.UUID, request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)) -> dict:
+    limit(request, "post_delete", max_hits=20, window_seconds=600)
+    post = db.get(Post, post_id)
+    if post is None or post.author_id != user.id:
+        raise HTTPException(status_code=404, detail="That post is gone.")
+    comments = list(db.scalars(select(Comment).where(Comment.post_id == post.id)))
+    comment_ids = [comment.id for comment in comments]
+    if comment_ids:
+        comments.extend(db.scalars(select(Comment).where(Comment.parent_id.in_(comment_ids))).all())
+    reactions = list(db.scalars(select(Reaction).where(Reaction.post_id == post.id)))
+    notification_stmt = select(Notification).where(Notification.post_id == post.id)
+    if comment_ids:
+        notification_stmt = select(Notification).where((Notification.post_id == post.id) | Notification.comment_id.in_(comment_ids))
+    notifications = list(db.scalars(notification_stmt))
+    report_stmt = select(Report).where(Report.target_id == post.id, Report.target_type == "post")
+    reports = list(db.scalars(report_stmt))
+    if comment_ids:
+        reports.extend(db.scalars(select(Report).where(Report.target_type == "comment", Report.target_id.in_(comment_ids))).all())
+    archive_records(db, PostHistory, [post], user.id)
+    archive_records(db, CommentHistory, comments, user.id)
+    archive_records(db, ReactionHistory, reactions, user.id)
+    archive_records(db, NotificationHistory, notifications, user.id)
+    archive_records(db, ReportHistory, reports, user.id)
+    db.execute(delete(Notification).where(Notification.id.in_([item.id for item in notifications])))
+    db.execute(delete(Comment).where(Comment.id.in_([item.id for item in comments])))
+    db.execute(delete(Reaction).where(Reaction.id.in_([item.id for item in reactions])))
+    db.execute(delete(Report).where(Report.id.in_([item.id for item in reports])))
+    image_file = post.image_file
+    db.delete(post)
+    db.commit()
+    if image_file:
+        remove_file(POSTS_DIR / image_file)
+    return {"ok": True}
+
+
 @app.put("/posts/{post_id}/reaction", response_model=PostOut)
 def set_reaction(
     post_id: uuid.UUID,
@@ -964,8 +1041,30 @@ def list_comments(
                 continue
             replies_by_parent.setdefault(reply.parent_id, []).append(reply)
 
-    comments = [comment_to_public(t, replies_by_parent.get(t.id, [])) for t in tops]
+    comments = [comment_to_public(t, replies_by_parent.get(t.id, []), user.id if user else None) for t in tops]
     return CommentsOut(comments=comments, next_cursor=next_cursor)
+
+
+@app.delete("/comments/{comment_id}")
+def delete_comment(comment_id: uuid.UUID, request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)) -> dict:
+    limit(request, "comment_delete", max_hits=30, window_seconds=600)
+    comment = db.get(Comment, comment_id)
+    if comment is None or comment.author_id != user.id:
+        raise HTTPException(status_code=404, detail="That comment is gone.")
+    comments = [comment]
+    if comment.parent_id is None:
+        comments.extend(db.scalars(select(Comment).where(Comment.parent_id == comment.id)).all())
+    comment_ids = [item.id for item in comments]
+    notifications = list(db.scalars(select(Notification).where(Notification.comment_id.in_(comment_ids))))
+    reports = list(db.scalars(select(Report).where(Report.target_type == "comment", Report.target_id.in_(comment_ids))))
+    archive_records(db, CommentHistory, comments, user.id)
+    archive_records(db, NotificationHistory, notifications, user.id)
+    archive_records(db, ReportHistory, reports, user.id)
+    db.execute(delete(Notification).where(Notification.id.in_([item.id for item in notifications])))
+    db.execute(delete(Report).where(Report.id.in_([item.id for item in reports])))
+    db.execute(delete(Comment).where(Comment.id.in_(comment_ids)))
+    db.commit()
+    return {"ok": True}
 
 
 @app.post("/posts/{post_id}/comments", response_model=CommentOut)
@@ -1015,7 +1114,7 @@ def add_comment(
     )
     db.commit()
     db.refresh(comment)
-    return comment_to_public(comment)
+    return comment_to_public(comment, viewer_id=user.id)
 
 
 app.mount("/media", StaticFiles(directory=UPLOAD_DIR), name="media")

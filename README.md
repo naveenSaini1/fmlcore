@@ -68,7 +68,9 @@ stories. Its product rule is simple: **relatability over likes and followers**.
    npm run dev
    ```
 
-   Open [http://localhost:3000](http://localhost:3000). API documentation is
+   Open [http://localhost:3000](http://localhost:3000). Signed-out visitors land
+   on Explore; signed-in users have a personal space on the home page. `/me` is
+   the public About page with founder and platform information. API documentation is
    available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) and
    the liveness endpoint is `GET /health`.
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import SiteHeader from "../components/SiteHeader";
 import PostCard from "../components/PostCard";
 import { getLeaderboard, getMe } from "../../lib/api";
 
@@ -44,7 +43,6 @@ export default function LeaderboardPage() {
 
   return (
     <>
-      <SiteHeader user={user} />
       <main className="mx-auto max-w-3xl px-4 py-8">
         <header className="mb-7 border-4 border-ink bg-coral p-5 text-on-brand shadow-[7px_7px_0_var(--color-shadow)]">
           <p className="font-note text-3xl leading-none">the stories that hit home</p>

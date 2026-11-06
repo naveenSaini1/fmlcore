@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import SiteHeader from "../components/SiteHeader";
 import { getMe, getNotifications, markAllNotificationsRead, markNotificationRead } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
 
@@ -69,7 +68,6 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <SiteHeader user={user} />
       <main className="mx-auto max-w-3xl px-4 py-8">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>

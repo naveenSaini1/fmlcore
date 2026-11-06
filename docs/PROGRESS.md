@@ -27,7 +27,7 @@ owner names the stage and gives an explicit "go". The flow each time:
 - [x] **5 — Notifications + safety.** Notifications, block, mute, report, moderation-ready reports, and rate-limit coverage.
 - [x] **6 — Profile personality & motion.** Profile colors and stickers, reduced-motion-aware animation, and weekly Top Painer post leaderboard (anonymous posts remain anonymous).
 - [x] **7 — Dynamic themes + navigation polish.** Five site-wide palettes plus a system preference, saved per account, animated active routes, and accessible button feedback.
-- [x] **8 — The Confession Sky.** Animated public confession balloons, private visibility, creation, discovery, reactions, comments, and safety reuse.
+- [x] **8 — The Confession Sky.** Up to 30 public confession balloons, click-to-pop selection, persisted view counts, private visibility, creation, reactions, and comments. No random-discovery, load-more, or safety-options controls appear in this view.
 - [ ] **9 — Real-time interactions.** WebSocket updates for reactions, comments, and instant in-app notifications. *(planned; not started)*
 - [ ] **10 — Email notifications.** Send real emails for reactions and comments on a user's posts. *(planned; not started)*
 - **11 — Voice rooms.** Folded into Stage 12; no separate Stage 11 build.

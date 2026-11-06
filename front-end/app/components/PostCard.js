@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { mediaUrl } from "../../lib/api";
 import { categoryAccent, moodByKey } from "../../lib/taxonomy";
 import { timeAgo } from "../../lib/format";
@@ -9,8 +9,9 @@ import ReactionBar from "./ReactionBar";
 import Comments from "./Comments";
 import { ReportAction, UserSafetyActions } from "./SafetyActions";
 
-export default function PostCard({ post: initial, index = 0, preview = false, viewerId = null }) {
+export default function PostCard({ post: initial, index = 0, preview = false, viewerId = null, showSafety = true, onDelete, deleting = false }) {
   const [livePost, setLivePost] = useState(initial);
+  useEffect(() => setLivePost(initial), [initial]);
   const [showComments, setShowComments] = useState(false);
   const [hiddenBySafety, setHiddenBySafety] = useState(false);
   // In preview mode the parent re-renders with fresh props each keystroke,
@@ -51,7 +52,7 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
             </span>
           )}
         </div>
-        <span className="font-note text-xl leading-none text-ink/70">{timeAgo(post.created_at)}</span>
+        <div className="flex items-center gap-3"><span className="font-note text-xl leading-none text-ink/70">{timeAgo(post.created_at)}</span>{!preview && (onDelete || (viewerId && (!post.author || post.author.id !== viewerId))) ? <details className="post-actions"><summary aria-label="Post actions" title="Post actions">•••</summary><div className="post-actions-menu">{onDelete ? <button type="button" disabled={deleting} onClick={onDelete} className="block w-full border-2 border-ink bg-coral px-2 py-1 text-left text-xs font-extrabold">{deleting ? "Deleting…" : "Delete post"}</button> : <><ReportAction targetType="post" targetId={post.id} />{post.author ? <UserSafetyActions target={post.author} onHide={() => setHiddenBySafety(true)} /> : null}</>}</div></details> : null}</div>
       </div>
 
       <span
@@ -98,15 +99,6 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
                 setLivePost((p) => ({ ...p, comment_count: p.comment_count + delta }))
               }
             />
-          ) : null}
-          {viewerId && (!post.author || post.author.id !== viewerId) ? (
-            <details className="mt-3 text-sm">
-              <summary className="cursor-pointer font-extrabold underline">Safety options</summary>
-              <ReportAction targetType="post" targetId={post.id} />
-              {post.author && post.author.id !== viewerId ? (
-                <UserSafetyActions target={post.author} onHide={() => setHiddenBySafety(true)} />
-              ) : null}
-            </details>
           ) : null}
         </div>
       ) : null}

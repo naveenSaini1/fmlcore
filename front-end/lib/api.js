@@ -69,7 +69,9 @@ export function getFeed(cursor) {
 }
 
 export function getConfessions(cursor) {
-  return api(`/confessions${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
+  const params = new URLSearchParams({ limit: "30" });
+  if (cursor) params.set("cursor", cursor);
+  return api(`/confessions?${params.toString()}`);
 }
 
 export function getRandomConfession() { return api("/confessions/random"); }
@@ -154,6 +156,11 @@ export function reportContent({ targetType, targetId, reason, details }) {
     body: JSON.stringify({ target_type: targetType, target_id: targetId, reason, details }),
   });
 }
+
+export function getMyReportedPosts() { return api("/safety/reports/mine"); }
+export function getMyPosts(surface = "feed") { return api(`/me/posts?surface=${encodeURIComponent(surface)}&limit=30`); }
+export function deletePost(id) { return api(`/posts/${id}`, { method: "DELETE" }); }
+export function deleteComment(id) { return api(`/comments/${id}`, { method: "DELETE" }); }
 
 export function getPost(id) {
   return api(`/posts/${id}`);

@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import Field, { inputClass } from "../components/Field";
-import SiteHeader from "../components/SiteHeader";
-import SafetySettings from "../components/SafetySettings";
+import ReportedPosts from "../components/ReportedPosts";
 import { getMe, logout, mediaUrl, updateProfile, uploadAvatar } from "../../lib/api";
 import { PROFILE_COLORS, PROFILE_STICKERS, profileColor, profileSticker } from "../../lib/profile-style";
 
@@ -93,7 +92,6 @@ export default function ProfilePage() {
   if (!user) {
     return (
       <>
-        <SiteHeader />
         <main className="px-4 py-16 font-bold">Opening your profile…</main>
       </>
     );
@@ -103,7 +101,6 @@ export default function ProfilePage() {
 
   return (
     <>
-      <SiteHeader user={user} />
       <main className="mx-auto grid max-w-5xl gap-6 px-4 py-8 md:grid-cols-[280px_1fr]">
         <motion.section
           initial={reduce ? false : { opacity: 0, y: 12 }}
@@ -193,7 +190,7 @@ export default function ProfilePage() {
           </div>
         </form>
         <div className="md:col-span-2">
-          <SafetySettings />
+          <ReportedPosts />
         </div>
       </main>
     </>

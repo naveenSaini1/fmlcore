@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import Field, { inputClass } from "../components/Field";
-import SiteHeader from "../components/SiteHeader";
 import { login } from "../../lib/api";
 
 export default function LoginPage() {
@@ -35,7 +34,6 @@ export default function LoginPage() {
 
   return (
     <>
-      <SiteHeader />
       <main className="mx-auto grid max-w-5xl gap-8 px-4 py-8 md:grid-cols-[0.8fr_1fr] md:py-12">
         <section className="md:pt-8">
           <p className="inline-block rotate-2 border-4 border-ink bg-purple px-3 py-1 text-sm font-extrabold text-on-brand">welcome back</p>

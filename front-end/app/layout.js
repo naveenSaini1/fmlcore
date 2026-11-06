@@ -1,5 +1,6 @@
 import { Caveat, Outfit, Syne } from "next/font/google";
 import { NavigationProgress, PageMotion } from "./components/PageMotion";
+import SiteHeaderShell from "./components/SiteHeaderShell";
 import { ThemeProvider } from "./components/ThemeProvider";
 import "./globals.css";
 
@@ -17,6 +18,7 @@ export default function RootLayout({ children }) {
     <html lang="en" data-theme="system">
       <body className={`${syne.variable} ${outfit.variable} ${caveat.variable} antialiased`}>
         <ThemeProvider>
+          <SiteHeaderShell />
           <NavigationProgress />
           <PageMotion>{children}</PageMotion>
         </ThemeProvider>

@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { addComment, getComments, mediaUrl } from "../../lib/api";
+import { addComment, deleteComment, getComments, mediaUrl } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
 import { profileColor, profileSticker } from "../../lib/profile-style";
-import { ReportAction, UserSafetyActions } from "./SafetyActions";
 
 function Identity({ comment }) {
   const avatar = comment.author ? mediaUrl(comment.author.avatar_url) : null;
@@ -72,6 +71,14 @@ function CommentItem({ postId, comment, onReplyAdded, viewerId, onHideUser, hidd
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  async function removeComment(id) {
+    if (!window.confirm("Delete this comment permanently?")) return;
+    setDeleting(true);
+    try { await deleteComment(id); window.dispatchEvent(new CustomEvent("fmlcore:comment-deleted", { detail: { postId, commentId: comment.id, deletedId: id } })); }
+    catch (err) { setError(err.message); setDeleting(false); }
+  }
 
   async function submitReply(body, anon) {
     setPending(true);
@@ -91,15 +98,6 @@ function CommentItem({ postId, comment, onReplyAdded, viewerId, onHideUser, hidd
     <div className="border-2 border-ink bg-white p-3">
       <Identity comment={comment} />
       <p className="mt-2 whitespace-pre-wrap break-words text-sm font-semibold">{comment.body}</p>
-      {viewerId && (comment.is_anonymous || comment.author?.id !== viewerId) ? (
-        <details className="mt-2 text-xs">
-          <summary className="cursor-pointer font-extrabold underline">Safety options</summary>
-          <ReportAction targetType="comment" targetId={comment.id} />
-          {comment.author && comment.author.id !== viewerId ? (
-            <UserSafetyActions target={comment.author} onHide={() => onHideUser(comment.author.id)} />
-          ) : null}
-        </details>
-      ) : null}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -107,6 +105,7 @@ function CommentItem({ postId, comment, onReplyAdded, viewerId, onHideUser, hidd
       >
         {open ? "Cancel" : "Reply"}
       </button>
+      {comment.is_mine ? <button type="button" disabled={deleting} onClick={() => removeComment(comment.id)} className="ml-3 mt-2 text-xs font-extrabold text-ink/60 underline disabled:opacity-50">{deleting ? "Deleting…" : "Delete"}</button> : null}
       {error ? <p className="mt-1 text-xs font-bold text-danger">{error}</p> : null}
       {open ? <ReplyForm onSubmit={submitReply} pending={pending} /> : null}
 
@@ -116,15 +115,7 @@ function CommentItem({ postId, comment, onReplyAdded, viewerId, onHideUser, hidd
             <div key={reply.id}>
               <Identity comment={reply} />
               <p className="mt-1 whitespace-pre-wrap break-words text-sm font-semibold">{reply.body}</p>
-              {viewerId && (reply.is_anonymous || reply.author?.id !== viewerId) ? (
-                <details className="mt-1 text-xs">
-                  <summary className="cursor-pointer font-extrabold underline">Safety options</summary>
-                  <ReportAction targetType="comment" targetId={reply.id} />
-                  {reply.author && reply.author.id !== viewerId ? (
-                    <UserSafetyActions target={reply.author} onHide={() => onHideUser(reply.author.id)} />
-                  ) : null}
-                </details>
-              ) : null}
+              {reply.is_mine ? <button type="button" disabled={deleting} onClick={() => removeComment(reply.id)} className="mt-1 text-xs font-extrabold text-ink/60 underline disabled:opacity-50">{deleting ? "Deleting…" : "Delete"}</button> : null}
             </div>
           ))}
         </div>
@@ -164,6 +155,26 @@ export default function Comments({ post, onCountChange, viewerId }) {
     load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const onDeleted = (event) => {
+      const { postId, commentId, deletedId } = event.detail || {};
+      if (postId !== post.id) return;
+      let removed = 0;
+      setComments((current) => current.flatMap((item) => {
+        if (item.id === deletedId) { removed += 1 + (item.replies?.length || 0); return []; }
+        const replies = item.replies || [];
+        if (replies.some((reply) => reply.id === deletedId)) {
+          removed += 1;
+          return [{ ...item, replies: replies.filter((reply) => reply.id !== deletedId) }];
+        }
+        return [item];
+      }));
+      if (removed) bump(-removed);
+    };
+    window.addEventListener("fmlcore:comment-deleted", onDeleted);
+    return () => window.removeEventListener("fmlcore:comment-deleted", onDeleted);
+  }, [post.id]);
 
   function bump(delta) {
     onCountChange?.(delta);

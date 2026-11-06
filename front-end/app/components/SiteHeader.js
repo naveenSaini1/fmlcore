@@ -112,7 +112,7 @@ function UnreadBadge() {
 }
 
 function ActiveIndicator({ reduce }) {
-  return <motion.span layoutId="active-nav-indicator" className="absolute inset-x-1 bottom-0 h-1 bg-coral" transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 32 }} />;
+  return <motion.span layoutId="active-nav-indicator" className="absolute inset-x-1 bottom-0 h-1 bg-coral" transition={reduce ? { duration: 0 } : { type: "tween", duration: 0.55, ease: [0.22, 1, 0.36, 1] }} />;
 }
 
 export default function SiteHeader({ user }) {
@@ -134,14 +134,17 @@ export default function SiteHeader({ user }) {
             <span className="sm:hidden" aria-hidden>✦</span><span className="hidden sm:inline">Explore</span>
             {isActive("/explore") ? <ActiveIndicator reduce={reduce} /> : null}
           </Link>
-          <Link href="/confessions" aria-label="Confession Sky" aria-current={isActive("/confessions") ? "page" : undefined} className={navClass(isActive("/confessions"))}>
-            <span aria-hidden>◯</span><span className="hidden sm:inline"> Sky</span>
+          <Link href="/confessions" aria-label="Confession" aria-current={isActive("/confessions") ? "page" : undefined} className={navClass(isActive("/confessions"))}>
+            <span className="sm:hidden" aria-hidden>◯</span><span className="hidden sm:inline">Confession</span>
             {isActive("/confessions") ? <ActiveIndicator reduce={reduce} /> : null}
           </Link>
           <Link href="/leaderboard" aria-label="Leaderboard" aria-current={isActive("/leaderboard") ? "page" : undefined} className={`${navClass(isActive("/leaderboard"))} ${isActive("/leaderboard") ? "" : "bg-coral text-on-brand"}`}>
             <span className="sm:hidden">Top</span><span className="hidden sm:inline">Leaderboard</span>
             {isActive("/leaderboard") ? <ActiveIndicator reduce={reduce} /> : null}
           </Link>
+          {!user ? (
+            <Link href="/me" aria-current={isActive("/me") ? "page" : undefined} className={navClass(isActive("/me"))}>About{isActive("/me") ? <ActiveIndicator reduce={reduce} /> : null}</Link>
+          ) : null}
           {user ? (
             <Link href="/notifications" aria-current={isActive("/notifications") ? "page" : undefined} aria-label="Notifications" className={navClass(isActive("/notifications"))}>
               <span className="sm:hidden">Inbox</span><span className="hidden sm:inline">Notifications</span><UnreadBadge />

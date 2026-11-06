@@ -8,7 +8,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ### Added
 - A dedicated `/confessions` floating-balloon experience with independent CSS motion, glossy balloon bodies, paper tags, responsive density, and reduced-motion support.
 - Real public/private confession records backed by the existing post, reaction, comment, safety, and moderation infrastructure.
-- Confession composer with colour choice, anonymous/private controls, random discovery, progressive loading, and a selected-confession detail panel.
+- Confession composer with colour choice and anonymous/private controls; the sky loads up to 30 balloons and opens the selected confession after a click-to-pop animation.
+- Persisted confession view counts increment when a balloon is popped. The sky detail view omits the safety-options menu; moderation and safety routes remain available elsewhere.
+- Post reporting and account block/mute actions are grouped under a per-post three-dot menu; profiles list the signed-in user's reported posts and report statuses.
+- Home includes My posts and My confessions views. Confession entries show their persisted view counts; account block/mute lists were removed from the profile safety area.
+- The main navigation labels `/confessions` as “Confession”. The signed-in home page is a personal space with a composer and owned content only; each owned entry has a three-dot delete menu with confirmation.
+- Signed-out home opens Explore, while signed-in users see their personal space on the home page. `/me` is a public About page with founder and platform information, linked from the navigation for every visitor.
 
 ## [0.7.0] — 2026-11-04 — Stage 7: themes + navigation polish
 

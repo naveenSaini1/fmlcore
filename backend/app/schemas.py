@@ -147,6 +147,7 @@ class CommentOut(BaseModel):
     id: uuid.UUID
     body: str
     is_anonymous: bool
+    is_mine: bool = False
     author: AuthorOut | None
     parent_id: uuid.UUID | None
     created_at: datetime
