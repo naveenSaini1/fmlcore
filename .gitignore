@@ -1,0 +1,12 @@
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+!.env.example
+!.env.production.example
+uploads/
+.DS_Store
+*.log

@@ -1,52 +1,57 @@
-# Contributing to fmlcore
+# Contributing to FMLCore
 
-> Bring a useful idea, a clear change, and your best “well, that escalated quickly” energy.
+Thanks for improving FMLCore. Keep pull requests focused, reviewable, and safe
+for people running their own forks.
 
-fmlcore welcomes thoughtful contributions from anyone. Code, documentation, design, and better questions all count.
+## Start with a branch
 
-## Start here
-
-1. Fork the repository.
-2. Clone your fork and create one focused branch.
-3. Make your change and update documentation when behaviour changes.
-4. Test the part you touched when a test or local command exists.
-5. Open a pull request that explains the problem and the change.
+Fork the repository, create a branch from the current default branch, and give
+it a purpose-based name:
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/fmlcore.git
-cd fmlcore
-git checkout -b feat/short-description
+git switch -c fix/profile-image-validation
 ```
 
-## Commit messages
+Do not commit `.env` files, credentials, database dumps, uploads, or build
+output. Copy the example environment files instead.
 
-We push completed stages with conventional, readable commits:
+## Product work follows stages
 
-```text
-type(scope): short imperative summary
-```
+Read `docs/PROGRESS.md` before starting. New product features are built one
+numbered stage at a time. Propose the scope and meaningful decisions, obtain
+the owner's explicit approval, then implement and document the completed work.
+This keeps the roadmap, API, interface, and version history aligned.
 
-Use one of these types:
+## Before opening a pull request
 
-- `feat` — a new user-facing capability
-- `fix` — a corrected behaviour
-- `docs` — documentation only
-- `refactor` — internal restructuring without changed behaviour
-- `test` — tests only
-- `chore` — maintenance or tooling
+1. Keep the change scoped; explain any behavior, data, or configuration impact.
+2. Run `npm ci && npm run build` in `front-end`.
+3. Run `python -m compileall -q app` with the backend virtual environment.
+4. Manually exercise the changed workflow against a fresh/local database.
+5. Update documentation, examples, and `CHANGELOG.md` when users or operators
+   need to do something differently.
 
-Examples:
+Pull requests should state the problem, approach, verification performed, and
+any follow-up work. Include screenshots for visible UI changes and avoid
+unrelated formatting churn.
 
-```text
-feat(core): add weekly reflection flow
-fix(ui): preserve draft after refresh
-docs(contributing): clarify pull request steps
-```
+## Maintainer release checklist
 
-## Pull requests
+1. Review and merge only passing CI runs.
+2. Confirm environment examples and deployment notes cover new settings.
+3. Back up production PostgreSQL before a release that changes data behavior.
+4. Deploy to a staging environment, then verify `/health`, sign-up/login, post
+   creation, media upload, and the primary changed path.
+5. Update `VERSION`, `CHANGELOG.md`, FastAPI's version, `front-end/package.json`,
+   and `docs/PROGRESS.md` together for a completed stage.
+6. Monitor application logs, error rates, database capacity, and upload storage
+   after release; retain a documented rollback point.
 
-Keep each pull request small enough to review. Tell us what changed, why it matters, how you tested it, and any follow-up work. Avoid unrelated formatting or drive-by rewrites.
+## Code and configuration conventions
 
-## Community standard
-
-Be respectful, specific, and kind. Challenge ideas without targeting people. This space is for building useful things, not performing perfection.
+- Keep the front-end API route same-origin (`/api`) so session cookies remain
+  first-party.
+- Production must use HTTPS, a unique `JWT_SECRET`, restricted `CORS_ORIGINS`,
+  and secure cookies.
+- Keep backend taxonomy and `front-end/lib/taxonomy.js` synchronized.
+- Do not represent unimplemented roadmap items as shipped functionality.
