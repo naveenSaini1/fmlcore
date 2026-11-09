@@ -5,6 +5,8 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import psycopg
+
 from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -462,7 +464,23 @@ def process_one_job() -> bool:
 
 
 def run_worker() -> None:
-    logger.info("Same Sky worker started.")
+    logger.info("Same Sky event-driven worker started (PostgreSQL LISTEN/NOTIFY).")
+    raw_url = settings.database_url.replace("postgresql+psycopg://", "postgresql://")
+    # Drain any backlog on startup
+    while process_one_job():
+        pass
     while True:
-        if not process_one_job():
-            time.sleep(max(0.5, settings.same_sky_job_poll_seconds))
+        try:
+            with psycopg.connect(raw_url, autocommit=True) as conn:
+                conn.execute("LISTEN same_sky_jobs;")
+                logger.info("Worker listening for Same Sky job events on channel 'same_sky_jobs'.")
+                while True:
+                    # Wait for PostgreSQL notification with a 60-second recovery timeout (0 SQL queries while idle)
+                    for _ in conn.notifies(timeout=60.0, stop_after=1):
+                        break
+                    # Drain all available jobs
+                    while process_one_job():
+                        pass
+        except Exception as exc:
+            logger.warning("Notification connection error (%s); reconnecting in 5s...", exc)
+            time.sleep(5.0)

@@ -9,7 +9,7 @@ from sqlalchemy import delete, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.db import get_db
+from app.db import get_db, SessionLocal
 from app.limiter import limit
 from app.models import (
     SameSkyAnalysis,
@@ -257,13 +257,24 @@ def start_matching_attempt(
     attempt = SameSkyAttempt(user_id=user.id, local_day=local_now.date(), status="queued")
     db.add(attempt)
     db.flush()
-    enqueue_job(db, "find_match", {"attempt_id": str(attempt.id)})
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=429, detail="A matching search is already in progress.") from None
-    return {"id": attempt.id, "status": attempt.status, "next_attempt_at": profile.next_attempt_at}
+
+    # Run the match search immediately (pure local pgvector comparison, <50ms)
+    from app.same_sky_matching import _find_match
+    _find_match(attempt.id)
+    with SessionLocal() as check_db:
+        refreshed_attempt = check_db.get(SameSkyAttempt, attempt.id)
+        refreshed_profile = check_db.scalar(select(SameSkyProfile).where(SameSkyProfile.user_id == user.id))
+        return {
+            "id": refreshed_attempt.id,
+            "status": refreshed_attempt.status,
+            "next_attempt_at": refreshed_profile.next_attempt_at if refreshed_profile else None,
+            "match_id": refreshed_attempt.match_id,
+        }
 
 
 @router.get("/attempts/{attempt_id}")

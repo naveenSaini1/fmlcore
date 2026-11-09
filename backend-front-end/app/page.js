@@ -38,6 +38,7 @@ export default function AdminPage() {
   const [settingNote, setSettingNote] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
   const [dashboardError, setDashboardError] = useState("");
+  const [workerActionNote, setWorkerActionNote] = useState("");
 
   const loadDashboard = useCallback(async (nextPage = page, search = query) => {
     setDashboardError("");
@@ -102,6 +103,36 @@ export default function AdminPage() {
       await loadDashboard(page, query);
     } catch (error) {
       setSettingNote(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleWorker() {
+    setBusy(true);
+    setWorkerActionNote("");
+    try {
+      const isRunning = overview?.worker_status?.running;
+      const endpoint = isRunning ? "/admin/worker/stop" : "/admin/worker/start";
+      const res = await api(endpoint, { method: "POST" });
+      setWorkerActionNote(isRunning ? "Worker stopped." : `Worker started (PID ${res.pids?.join(", ") || ""}).`);
+      await loadDashboard(page, query);
+    } catch (err) {
+      setWorkerActionNote(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBatch() {
+    setBusy(true);
+    setWorkerActionNote("");
+    try {
+      const res = await api("/admin/worker/process-batch", { method: "POST" });
+      setWorkerActionNote(`Processed ${res.processed_count} jobs on-demand. (${res.remaining_queued} remaining)`);
+      await loadDashboard(page, query);
+    } catch (err) {
+      setWorkerActionNote(err.message);
     } finally {
       setBusy(false);
     }
@@ -196,6 +227,37 @@ export default function AdminPage() {
         </article>
 
         <aside className="card panel">
+          <section className="worker-box" style={{ background: "rgba(0,0,0,0.03)", border: "2px solid #171717", borderRadius: 8, padding: 16, marginBottom: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <p className="eyebrow" style={{ margin: 0 }}>Background Worker</p>
+              <span className={`pill ${overview?.worker_status?.running ? "" : "pill-off"}`}>
+                {overview?.worker_status?.running ? `● RUNNING (${overview.worker_status.pids.join(", ")})` : "○ STOPPED"}
+              </span>
+            </div>
+            <p className="panel-subtitle" style={{ fontSize: "0.82rem", marginBottom: 12 }}>
+              Event-driven via PostgreSQL LISTEN/NOTIFY. When OFF, the worker process is killed: 0 CPU, 0 database queries.
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: workerActionNote ? 8 : 0 }}>
+              <button
+                type="button"
+                className={`btn ${overview?.worker_status?.running ? "btn-coral" : ""}`}
+                disabled={busy}
+                onClick={toggleWorker}
+              >
+                {overview?.worker_status?.running ? "Turn OFF (Kill)" : "Turn ON (Start)"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-quiet"
+                disabled={busy || !overview?.worker_status?.queued_jobs}
+                onClick={runBatch}
+              >
+                Process Backlog ({overview?.worker_status?.queued_jobs ?? 0})
+              </button>
+            </div>
+            {workerActionNote && <p className="form-note" style={{ color: "#ff5c4d", margin: 0, marginTop: 8 }}>{workerActionNote}</p>}
+          </section>
+
           <p className="eyebrow">same sky knobs</p><h2 style={{ marginBottom: 7 }}>Matching rules</h2><p className="panel-subtitle" style={{ marginBottom: 18 }}>Provider changes apply to analysis jobs picked up after saving. Matching rules apply immediately.</p>
           {settings && <form className="settings-form" onSubmit={saveSettings}>
             <div className="settings-field"><span>AI story analysis provider</span><div className="provider-switch" role="group" aria-label="AI story analysis provider"><button type="button" className={`btn ${settings.same_sky_ai_provider === "gemini" ? "" : "btn-quiet"}`} aria-pressed={settings.same_sky_ai_provider === "gemini"} onClick={() => setSettings({ ...settings, same_sky_ai_provider: "gemini" })}>Gemini</button><button type="button" className={`btn ${settings.same_sky_ai_provider === "groq" ? "" : "btn-quiet"}`} aria-pressed={settings.same_sky_ai_provider === "groq"} disabled={!overview?.ai_provider_status?.groq} onClick={() => setSettings({ ...settings, same_sky_ai_provider: "groq" })}>Groq</button></div><span className="field-help">New analysis jobs use this provider. Gemini still creates the matching embeddings. Completed stories are not reprocessed when you switch.</span></div>

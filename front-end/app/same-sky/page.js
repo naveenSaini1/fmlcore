@@ -160,9 +160,15 @@ export default function SameSkyPage() {
         setPrefs(enabledPrefs);
       }
       const attempt = await startSameSkyAttempt();
-      setAttemptId(attempt.id);
-      setFlowStatus("searching");
-      await refresh();
+      if (attempt?.status && ["match_found", "no_match", "unavailable", "not_eligible"].includes(attempt.status)) {
+        setAttemptId(null);
+        await refresh();
+        setFlowStatus(attempt.status);
+      } else {
+        setAttemptId(attempt.id);
+        setFlowStatus("searching");
+        await refresh();
+      }
     } catch (err) {
       setFlowStatus("idle");
       setError(err.message);

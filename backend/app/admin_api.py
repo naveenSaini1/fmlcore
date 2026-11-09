@@ -28,6 +28,7 @@ from app.same_sky_ai import safe_themes
 from app.same_sky_common import ELIGIBLE_ENTRY_STATUSES, update_eligibility
 from app.same_sky_scoring import score_candidate
 from app.system_settings import AI_PROVIDER, AI_PROVIDER_VALUES, DEFAULT_THEME, DEFAULT_THEME_VALUES, REQUIRED_CONFESSIONS, REQUIRED_POSTS, RETRY_MINUTES, default_theme, same_sky_ai_provider, same_sky_rules
+from app.worker_control import get_worker_status, process_batch, start_worker, stop_worker
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -84,12 +85,33 @@ def admin_overview(
         "confessions_total": confession_count,
         "same_sky_matching_enabled": opted_in,
         "same_sky_jobs": job_statuses,
+        "worker_status": get_worker_status(),
         "settings": {**same_sky_rules(db), "same_sky_ai_provider": same_sky_ai_provider(db), "default_theme": default_theme(db)},
         "ai_provider_status": {
             "gemini": settings.same_sky_gemini_ready,
             "groq": settings.same_sky_gemini_ready and bool(settings.groq_api_key),
         },
     }
+
+
+@router.get("/worker/status")
+def admin_worker_status(_admin: User = Depends(admin_user)) -> dict:
+    return get_worker_status()
+
+
+@router.post("/worker/start")
+def admin_worker_start(_admin: User = Depends(admin_user)) -> dict:
+    return start_worker()
+
+
+@router.post("/worker/stop")
+def admin_worker_stop(_admin: User = Depends(admin_user)) -> dict:
+    return stop_worker()
+
+
+@router.post("/worker/process-batch")
+def admin_worker_process_batch(_admin: User = Depends(admin_user)) -> dict:
+    return process_batch(max_jobs=50)
 
 
 @router.get("/users")

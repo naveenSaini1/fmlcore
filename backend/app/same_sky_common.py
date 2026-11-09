@@ -53,7 +53,9 @@ def analysis_fingerprint(entry_type: str, title: str, description: str, category
 
 def enqueue_job(db: Session, job_type: str, payload: dict) -> None:
     from app.models import SameSkyJob
+    from sqlalchemy import text
     db.add(SameSkyJob(job_type=job_type, payload=payload, status="queued"))
+    db.execute(text("NOTIFY same_sky_jobs;"))
 
 
 def invalidate_matches(db: Session, user_id: uuid.UUID) -> None:
