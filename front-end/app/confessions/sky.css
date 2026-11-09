@@ -16,3 +16,4 @@
 .sky-balloon.is-popping .balloon-rig{animation:none!important}
 @media(max-width:800px){.sky-canvas{height:max(65vh,700px);min-height:max(65vh,700px)}}
 @media(prefers-reduced-motion:reduce){.balloon-rig{animation:none!important;transform:translate3d(var(--drift),var(--target-y),0) scale(var(--size))}}
+.analysis-disclosure{margin:.65rem 0;padding:.55rem .65rem;border:1px solid currentColor;font-size:.78rem;line-height:1.4;opacity:.82}

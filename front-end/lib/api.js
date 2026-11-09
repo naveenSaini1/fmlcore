@@ -37,6 +37,10 @@ export function getMe() {
   return api("/auth/me");
 }
 
+export function getPlatformDefaultTheme() {
+  return api("/platform/default-theme");
+}
+
 export function signup(body) {
   return api("/auth/signup", { method: "POST", body: JSON.stringify(body) });
 }
@@ -158,9 +162,19 @@ export function reportContent({ targetType, targetId, reason, details }) {
 }
 
 export function getMyReportedPosts() { return api("/safety/reports/mine"); }
-export function getMyPosts(surface = "feed") { return api(`/me/posts?surface=${encodeURIComponent(surface)}&limit=30`); }
+export function getMyPosts(surface = "feed", limit = 100) { return api(`/me/posts?surface=${encodeURIComponent(surface)}&limit=${limit}`); }
 export function deletePost(id) { return api(`/posts/${id}`, { method: "DELETE" }); }
 export function deleteComment(id) { return api(`/comments/${id}`, { method: "DELETE" }); }
+
+export function getSameSky() { return api("/same-sky"); }
+export function includePostInSameSky(id) { return api(`/same-sky/posts/${id}/include`, { method: "POST" }); }
+export function excludePostFromSameSky(id) { return api(`/same-sky/posts/${id}/include`, { method: "DELETE" }); }
+export function updateSameSkyProfile(body) { return api("/same-sky/profile", { method: "PATCH", body: JSON.stringify(body) }); }
+export function retrySameSkyPost(id) { return api(`/same-sky/posts/${id}/retry`, { method: "POST" }); }
+export function startSameSkyAttempt() { return api("/same-sky/attempts", { method: "POST" }); }
+export function getSameSkyAttempt(id) { return api(`/same-sky/attempts/${id}`); }
+export function respondToSameSkyMatch(id, accept) { return api(`/same-sky/matches/${id}/response`, { method: "POST", body: JSON.stringify({ accept }) }); }
+export function reopenSameSkyMatch(id) { return api(`/same-sky/matches/${id}/reopen`, { method: "POST" }); }
 
 export function getPost(id) {
   return api(`/posts/${id}`);

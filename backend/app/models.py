@@ -1,17 +1,22 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
+    Date,
     DateTime,
+    Float,
     ForeignKey,
     JSON,
+    Index,
     String,
     Text,
     UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import VECTOR
 
 from app.db import Base
 
@@ -28,10 +33,20 @@ class User(Base):
     avatar_file: Mapped[str | None] = mapped_column(String(255), nullable=True)
     profile_color: Mapped[str] = mapped_column(String(20), default="lime", server_default="lime")
     profile_sticker: Mapped[str] = mapped_column(String(20), default="star", server_default="star")
-    theme: Mapped[str] = mapped_column(String(30), default="system", server_default="system")
+    theme: Mapped[str] = mapped_column(String(30), default="acid-lime", server_default="acid-lime")
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    value: Mapped[int] = mapped_column(nullable=False)
+    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class Post(Base):
@@ -99,6 +114,7 @@ class Notification(Base):
     kind: Mapped[str] = mapped_column(String(20))
     post_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("posts.id"), nullable=True)
     comment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("comments.id"), nullable=True)
+    same_sky_match_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("same_sky_matches.id", ondelete="SET NULL"), nullable=True, index=True)
     actor_anonymous: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
@@ -167,3 +183,115 @@ class NotificationHistory(HistoryBase):
 
 class ReportHistory(HistoryBase):
     __tablename__ = "reports_history"
+
+
+class SameSkyProfile(Base):
+    __tablename__ = "same_sky_profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True)
+    eligibility_status: Mapped[str] = mapped_column(String(24), default="collecting", server_default="collecting", index=True)
+    matching_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    timezone: Mapped[str] = mapped_column(String(64), default="UTC", server_default="UTC")
+    preferred_categories: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class SameSkyAnalysis(Base):
+    __tablename__ = "same_sky_analysis"
+    __table_args__ = (
+        CheckConstraint("entry_type IN ('experience', 'confession')", name="ck_same_sky_analysis_type"),
+        Index("ix_same_sky_analysis_user_type", "user_id", "entry_type"),
+        Index("ix_same_sky_analysis_user_status", "user_id", "processing_status"),
+    )
+
+    post_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("posts.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    entry_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    analysis_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    processing_status: Mapped[str] = mapped_column(String(24), default="pending", server_default="pending", index=True)
+    duplicate_status: Mapped[str] = mapped_column(String(24), default="clear", server_default="clear")
+    processing_error: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    themes: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    experience_context: Mapped[str] = mapped_column(String(80), default="", server_default="")
+    safe_summary: Mapped[str] = mapped_column(String(280), default="", server_default="")
+    emotional_context: Mapped[str] = mapped_column(String(80), default="", server_default="")
+    copy_signal: Mapped[str] = mapped_column(String(16), default="low", server_default="low")
+    safety_flags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    model_name: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class SameSkyEmbedding(Base):
+    __tablename__ = "same_sky_embeddings"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    post_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("posts.id", ondelete="CASCADE"), unique=True, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    embedding: Mapped[list[float]] = mapped_column(VECTOR(768), nullable=False)
+    embedding_model: Mapped[str] = mapped_column(String(120), nullable=False)
+    embedding_version: Mapped[str] = mapped_column(String(120), nullable=False)
+    content_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_same_sky_embeddings_hnsw", "embedding", postgresql_using="hnsw", postgresql_ops={"embedding": "vector_cosine_ops"}),
+    )
+
+
+class SameSkyMatch(Base):
+    __tablename__ = "same_sky_matches"
+    __table_args__ = (
+        UniqueConstraint("user_a_id", "user_b_id", name="uq_same_sky_match_pair"),
+        CheckConstraint("user_a_id < user_b_id", name="ck_same_sky_match_order"),
+        CheckConstraint("user_a_id != user_b_id", name="ck_same_sky_match_distinct_users"),
+        Index("ix_same_sky_matches_user_a_status", "user_a_id", "status"),
+        Index("ix_same_sky_matches_user_b_status", "user_b_id", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_a_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user_b_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    initiated_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    declined_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending", index=True)
+    accepted_by_a: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    accepted_by_b: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    similarity_score: Mapped[float] = mapped_column(Float, nullable=False)
+    shared_themes: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    safe_explanation: Mapped[str] = mapped_column(String(320), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class SameSkyAttempt(Base):
+    __tablename__ = "same_sky_matching_attempts"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    local_day: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="queued", server_default="queued", index=True)
+    match_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("same_sky_matches.id", ondelete="SET NULL"), nullable=True)
+    candidates_evaluated: Mapped[int] = mapped_column(default=0, server_default="0", nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SameSkyJob(Base):
+    __tablename__ = "same_sky_jobs"
+    __table_args__ = (Index("ix_same_sky_jobs_ready", "status", "run_after", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    job_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="queued", server_default="queued", index=True)
+    attempts: Mapped[int] = mapped_column(default=0, server_default="0", nullable=False)
+    run_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

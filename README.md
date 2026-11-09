@@ -3,7 +3,7 @@
 FMLCore is an 18+ social app for funny, embarrassing, painful, and random life
 stories. Its product rule is simple: **relatability over likes and followers**.
 
-> **Current version:** 0.7.0 · Stages 0–7 are complete. See the
+> **Current version:** 0.9.0 · Stage 9-1 adds Same Sky matching. See the
 > [roadmap and handoff](docs/PROGRESS.md) before planning new product work.
 
 ## What is included
@@ -14,6 +14,13 @@ stories. Its product rule is simple: **relatability over likes and followers**.
   per-IP limits for sensitive actions.
 - Posts, images, comments, reactions, explore, notifications, profiles,
   dynamic themes, and a weekly leaderboard.
+- Same Sky matching from existing posts and Confession Sky balloons. Each new
+  post/confession is analyzed once after saving; “Start Matching” later compares
+  the stored results. Same Sky has mutual match
+  suggestions and a configurable retry timer after no match. It has no chat;
+  matched-user messaging is planned for Stage 9-2.
+- Same Sky eligibility thresholds are configurable with `SAME_SKY_REQUIRED_POSTS`
+  and `SAME_SKY_REQUIRED_CONFESSIONS` in backend settings.
 
 ## Fork and run locally
 
@@ -40,6 +47,11 @@ stories. Its product rule is simple: **relatability over likes and followers**.
 
    Set a unique `JWT_SECRET` in `backend/.env` even for a shared development
    environment. Keep `APP_ENV=development` and `COOKIE_SECURE=false` locally.
+   Same Sky uses Gemini for analysis by default and supports Groq as an
+   admin-selectable analysis provider. Gemini is required for embeddings. Set
+   `GEMINI_API_KEY` and `GEMINI_PAID_SERVICE_CONFIRMED=true` only after Gemini
+   billing is active; set `GROQ_API_KEY` only if you want Groq available in the
+   admin switch.
 
 3. Start PostgreSQL:
 
@@ -48,8 +60,9 @@ stories. Its product rule is simple: **relatability over likes and followers**.
    docker compose up -d
    ```
 
-   The development database listens on `localhost:5433`. Its credentials are
-   intentionally local-only defaults; never reuse them in a deployed system.
+   The development database listens on `localhost:5433` and uses the pgvector
+   Postgres image. Its credentials are intentionally local-only defaults;
+   never reuse them in a deployed system.
 
 4. In a second terminal, start the API:
 
@@ -57,10 +70,22 @@ stories. Its product rule is simple: **relatability over likes and followers**.
    cd backend
    python3 -m venv .venv
    .venv/bin/pip install -r requirements.txt
+   .venv/bin/alembic upgrade head
    .venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
    ```
 
-5. In a third terminal, start the web app:
+5. In a third terminal, start the background analysis worker:
+
+   ```bash
+   cd backend
+   .venv/bin/python -m app.same_sky_worker
+   ```
+
+   The worker analyzes queued new posts and confessions, then handles local
+   matching jobs. It defers analysis until both AI providers are configured and
+   Gemini billing is confirmed.
+
+6. In a fourth terminal, start the web app:
 
    ```bash
    cd front-end
@@ -74,15 +99,33 @@ stories. Its product rule is simple: **relatability over likes and followers**.
    available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) and
    the liveness endpoint is `GET /health`.
 
+7. To use the separate owner console, add your existing account email to
+   `ADMIN_EMAILS` in `backend/.env`, include `http://localhost:3001` in
+   `CORS_ORIGINS`, then start its frontend:
+
+   ```bash
+   cd backend-front-end
+   npm ci
+   npm run dev
+   ```
+
+   Open [http://localhost:3001](http://localhost:3001) and sign in with that
+   account. See [the admin console guide](docs/ADMIN_CONSOLE.md) for the metrics,
+   privacy boundary, and editable Same Sky rules.
+
 ### Local troubleshooting
 
 - `docker compose` must be installed as a Docker plugin. If it is unavailable,
-  point `DATABASE_URL` at any PostgreSQL 16-compatible database instead.
+  point `DATABASE_URL` at PostgreSQL 16 with the `vector` extension installed.
 - Browser requests use `/api/*`; Next.js proxies them to `API_ORIGIN` (default
   `http://127.0.0.1:8000`). Do not set `NEXT_PUBLIC_API_URL` to a different
   origin unless you have also planned cookie/CORS behavior deliberately.
 - Tailwind is pinned to `4.1.16`. Do not update it casually: later versions can
   conflict with Next 15's require hook.
+- Gemini's unpaid API service can use submitted prompts and responses to improve
+  Google's products. Same Sky requires a
+  billing-enabled Gemini project; see the [privacy and operations guide](docs/SAME_SKY_PRIVACY.md)
+  before enabling it.
 
 ## Deploying
 

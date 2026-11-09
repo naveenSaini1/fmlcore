@@ -3,6 +3,20 @@
 All notable changes to FMLCore. Versions track build stages as `0.<stage>.<patch>`.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.9.0] — 2026-11-06 — Stage 9-1: Same Sky matching
+
+### Added
+- Same Sky matching draws from a person's existing FMLCore posts and Confession Sky balloons. Each post has a separate matching opt-in; no duplicate story-writing flow is required. Readiness uses 10 analyzed posts and 5 analyzed confessions.
+- Background analysis jobs with bounded retries, admin-selectable Gemini/Groq story analysis, backend exact and near-duplicate checks, risk review, and 768-dimensional Gemini embeddings in pgvector. No mock AI output or hardcoded matches.
+- Candidate matching across multiple entries, context/theme scoring, consent and block filters, non-repeating declined pairs, privacy-safe match previews, and mutual accept/decline. A connection is created only after both people accept; chat is deferred to Stage 9-2.
+- Database-enforced daily matching attempts using the user's IANA timezone, a persistent UTC next-attempt time, and a unique user/local-day constraint.
+- Billing-enabled Gemini configuration, private-data operations guide, pgvector Postgres images, background worker service, and Alembic bootstrap migration for the existing schema.
+
+### Privacy and operations
+- Same Sky is unavailable until a server-side Gemini key and billing confirmation are configured. Unpaid Gemini API use can allow prompt and response data to be used to improve Google's products; the privacy guide requires a paid-service project.
+- Entry deletion/consent changes remove analyses and embeddings; pending matches are withdrawn and connected theme labels are cleared when their source context changes.
+- Same Sky never exposes original private text, AI summaries, safety flags, or match scores to another user.
+
 ## [0.8.0] — 2026-11-05 — Stage 8: The Confession Sky
 
 ### Added

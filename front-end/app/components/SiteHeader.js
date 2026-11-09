@@ -103,9 +103,16 @@ function UnreadBadge() {
 
   useEffect(() => {
     const refresh = () => getUnreadCount().then((data) => setCount(data.count)).catch(() => setCount(0));
+    const refreshWhenVisible = () => { if (document.visibilityState === "visible") refresh(); };
     refresh();
     window.addEventListener("fmlcore:notifications-change", refresh);
-    return () => window.removeEventListener("fmlcore:notifications-change", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("fmlcore:notifications-change", refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, []);
 
   return count ? <span className="ml-1 inline-flex min-w-5 items-center justify-center border border-ink bg-coral px-1 text-[10px] font-extrabold text-on-brand">{count > 99 ? "99+" : count}</span> : null;
@@ -138,6 +145,10 @@ export default function SiteHeader({ user }) {
             <span className="sm:hidden" aria-hidden>◯</span><span className="hidden sm:inline">Confession</span>
             {isActive("/confessions") ? <ActiveIndicator reduce={reduce} /> : null}
           </Link>
+          {user ? <Link href="/same-sky" aria-label="Same Sky" aria-current={isActive("/same-sky") ? "page" : undefined} className={navClass(isActive("/same-sky"))}>
+            <span className="sm:hidden" aria-hidden>☁</span><span className="hidden sm:inline">Same Sky</span>
+            {isActive("/same-sky") ? <ActiveIndicator reduce={reduce} /> : null}
+          </Link> : null}
           <Link href="/leaderboard" aria-label="Leaderboard" aria-current={isActive("/leaderboard") ? "page" : undefined} className={`${navClass(isActive("/leaderboard"))} ${isActive("/leaderboard") ? "" : "bg-coral text-on-brand"}`}>
             <span className="sm:hidden">Top</span><span className="hidden sm:inline">Leaderboard</span>
             {isActive("/leaderboard") ? <ActiveIndicator reduce={reduce} /> : null}

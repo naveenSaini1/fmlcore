@@ -7,6 +7,10 @@ import { timeAgo } from "../../lib/format";
 
 function notificationCopy(item) {
   const actor = item.is_anonymous ? "Someone anonymously" : `@${item.actor?.username ?? "Someone"}`;
+  if (item.kind === "same_sky_request") return `${actor} is open to connecting with you on Same Sky.`;
+  if (item.kind === "same_sky_reopened") return `${actor} reopened your declined Same Sky connection. You can send a fresh request.`;
+  if (item.kind === "same_sky_declined") return `${actor} declined your Same Sky connection request.`;
+  if (item.kind === "same_sky_connected") return `${actor} accepted your Same Sky request. You’re connected.`;
   if (item.kind === "reaction") return `${actor} reacted to your post.`;
   if (item.kind === "reply") return `${actor} replied to your comment.`;
   return `${actor} commented on your post.`;
@@ -83,7 +87,7 @@ export default function NotificationsPage() {
         {status === "ready" && items.length === 0 ? (
           <div className="border-4 border-dashed border-ink bg-white p-8 text-center">
             <p className="font-display text-2xl font-extrabold">All quiet for now.</p>
-            <p className="mt-2 font-semibold">When someone reacts or replies, it will show up here.</p>
+            <p className="mt-2 font-semibold">New replies, reactions, and Same Sky updates will show up here.</p>
           </div>
         ) : null}
         <div className="space-y-3">
@@ -97,7 +101,7 @@ export default function NotificationsPage() {
                 {!item.is_read ? <span className="mt-1 h-3 w-3 shrink-0 border-2 border-ink bg-lime" aria-label="Unread" /> : null}
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-4 text-sm font-extrabold">
-                <Link href="/" className="underline">Open the feed</Link>
+                <Link href={item.kind.startsWith("same_sky_") ? "/same-sky" : "/"} className="underline">{item.kind.startsWith("same_sky_") ? "Open Same Sky" : "Open the feed"}</Link>
                 {!item.is_read ? <button type="button" onClick={() => markOne(item.id)} className="underline">Mark read</button> : null}
               </div>
             </article>

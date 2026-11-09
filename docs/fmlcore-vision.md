@@ -119,19 +119,21 @@ Do one stage at a time. Wait for an explicit yes and a stage number before writi
 5. Notifications plus block, mute, report, rate limits, moderation hooks.
 6. Profile decorations, motion, and a weekly post leaderboard that preserves anonymous authorship.
 7. Dynamic site-wide themes, active-screen navigation states, and button hover effects.
-8. Real-time reactions, comments, and in-app notifications via WebSockets.
-9. Email notifications for reactions and comments on a user's posts.
-10. Voice rooms — folded into Stage 11, not a separate build stage.
-11. Social voice rooms and full voice meeting rooms (future stage; deferred for now).
+8. The Confession Sky, with real public/private confession balloons.
+9-1. Same Sky matching: use existing FMLCore posts and Confession Sky balloons; analyze each new story once after it is saved; gate matching on analyzed-story thresholds; compare saved analysis locally; support mutual match decisions and a configurable retry timer after no match. No duplicate story-writing flow or chat.
+9-2. Private chat between people who both accept a Same Sky match.
+10. Real-time reactions, comments, and in-app notifications via WebSockets.
+11. Email notifications for reactions and comments on a user's posts.
+12. Social voice rooms and full voice meeting rooms (future stage; deferred for now).
 
 Later: milestones and richer customization.
 
 ## Status
 
-Current version 0.7.0 — see `CHANGELOG.md`.
+Current version 0.9.0 — see `CHANGELOG.md`.
 
 Stages 0 (shell and tokens), 1 (accounts and profile), 2 (feed and posts), and 3 (reactions and comments) are built, running, and verified end to end. `image/` holds the icons.
 
-Stages 0–7 are complete. Stage 8 is next. Stage 10's voice-room scope is folded into deferred Stage 11. See `docs/PROGRESS.md` for the roadmap and handoff state.
+Stages 0–8 and 9-1 are complete. Stage 9-2 (matched-user chat) is next. Voice rooms remain in deferred Stage 12. See `docs/PROGRESS.md` for the roadmap and handoff state.
 
-The completed Stage 7 requirements and planned requirements for real-time WebSockets (Stage 8), email notifications (Stage 9), and the combined social voice rooms/full meeting-room experience (Stage 11) are recorded in `docs/PROGRESS.md`. Obtain explicit approval for each remaining stage before implementation.
+The completed Stage 9-1 requirements and planned requirements for matched-user chat (Stage 9-2), real-time WebSockets (Stage 10), email notifications (Stage 11), and the combined social voice rooms/full meeting-room experience (Stage 12) are recorded in `docs/PROGRESS.md`. Obtain explicit approval for each remaining stage before implementation.

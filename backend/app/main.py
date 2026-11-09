@@ -13,12 +13,12 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import UPLOAD_DIR, settings
-from app.db import Base, engine, get_db
+from app.db import get_db
 from app.limiter import limit
 from app.models import (
     CommentHistory,
@@ -31,6 +31,10 @@ from app.models import (
     ReactionHistory,
     Report,
     ReportHistory,
+    SameSkyAnalysis,
+    SameSkyMatch,
+    SameSkyProfile,
+    SameSkyJob,
     User,
     UserBlock,
     UserMute,
@@ -73,6 +77,10 @@ from app.security import (
 )
 from app.taxonomy import CATEGORIES, CATEGORY_SET, MOOD_KEYS, MOOD_SET, REACTION_SET
 from app.users import find_by_email, find_by_username, remove_file, sniff_image, to_public
+from app.same_sky_api import include_post_for_matching, router as same_sky_router
+from app.admin_api import router as admin_router
+from app.same_sky_common import invalidate_matches, update_eligibility
+from app.system_settings import default_theme
 
 AVATAR_DIR = UPLOAD_DIR / "avatars"
 POSTS_DIR = UPLOAD_DIR / "posts"
@@ -94,7 +102,9 @@ def archive_records(db: Session, history_model, rows: list, deleted_by: uuid.UUI
             snapshot[column.name] = value
         db.add(history_model(original_id=row.id, snapshot=snapshot, deleted_by=deleted_by))
 
-app = FastAPI(title="FMLCore", version="0.8.0")
+app = FastAPI(title="FMLCore", version="0.9.0")
+app.include_router(same_sky_router)
+app.include_router(admin_router)
 
 DAILY_PROMPTS = [
     "What's the plot twist today?",
@@ -121,22 +131,10 @@ def startup() -> None:
         "replace-with-a-long-random-secret",
     }:
         raise RuntimeError("JWT_SECRET must be set to a unique value in production.")
-    Base.metadata.create_all(bind=engine)
-    # Existing local databases predate profile customization columns.
-    with engine.begin() as connection:
-        connection.execute(text(
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_color VARCHAR(20) NOT NULL DEFAULT 'lime'"
-        ))
-        connection.execute(text(
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_sticker VARCHAR(20) NOT NULL DEFAULT 'star'"
-        ))
-        connection.execute(text(
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(30) NOT NULL DEFAULT 'system'"
-        ))
-        connection.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS surface VARCHAR(20) NOT NULL DEFAULT 'feed'"))
-        connection.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) NOT NULL DEFAULT 'public'"))
-        connection.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS balloon_color VARCHAR(20)"))
-        connection.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS view_count INTEGER NOT NULL DEFAULT 0"))
+    if settings.same_sky_embedding_dimensions != 768:
+        raise RuntimeError("SAME_SKY_EMBEDDING_DIMENSIONS must be 768 until a matching vector-column migration is deployed.")
+    if settings.is_production and settings.same_sky_ai_ready and not settings.same_sky_hash_secret:
+        raise RuntimeError("SAME_SKY_HASH_SECRET must be set before processing private Same Sky entries.")
 
 
 def current_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -162,6 +160,11 @@ def single_post_out(db: Session, post: Post, user: User | None) -> PostOut:
     return post_to_public(post, reactions, my_reaction, comment_count)
 
 
+def analyze_new_post_for_matching(db: Session, post: Post, user: User) -> None:
+    """Queue analysis for every newly created feed post or confession."""
+    include_post_for_matching(db, user, post)
+
+
 def notification_to_public(notification: Notification) -> NotificationOut:
     actor = None
     if notification.actor is not None and not notification.actor_anonymous:
@@ -184,6 +187,7 @@ def notification_to_public(notification: Notification) -> NotificationOut:
         is_anonymous=notification.actor_anonymous,
         post_id=notification.post_id,
         comment_id=notification.comment_id,
+        same_sky_match_id=notification.same_sky_match_id,
         is_read=notification.is_read,
         created_at=notification.created_at,
     )
@@ -192,6 +196,11 @@ def notification_to_public(notification: Notification) -> NotificationOut:
 @app.get("/health")
 def health() -> dict:
     return {"ok": True}
+
+
+@app.get("/platform/default-theme")
+def get_platform_default_theme(db: Session = Depends(get_db)) -> dict:
+    return {"theme": default_theme(db)}
 
 
 @app.post("/auth/signup", response_model=UserOut)
@@ -209,6 +218,8 @@ def signup(body: SignupIn, request: Request, response: Response, db: Session = D
         username_lower=body.username.lower(),
         password_hash=hash_password(body.password),
         bio="",
+        theme=default_theme(db),
+        last_login_at=datetime.now(timezone.utc),
     )
     db.add(user)
     try:
@@ -227,6 +238,8 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
     user = find_by_email(db, body.email.lower())
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Email or password is wrong.")
+    user.last_login_at = datetime.now(timezone.utc)
+    db.commit()
     response.set_cookie(**cookie_kwargs(make_token(user.id)))
     return to_public(user)
 
@@ -397,6 +410,17 @@ def block_user(
     )
     if existing is None:
         db.add(UserBlock(blocker_id=user.id, blocked_id=target.id))
+        db.execute(update(SameSkyMatch).where(
+            SameSkyMatch.status.in_(("pending", "connected")),
+            ((SameSkyMatch.user_a_id == user.id) & (SameSkyMatch.user_b_id == target.id))
+            | ((SameSkyMatch.user_a_id == target.id) & (SameSkyMatch.user_b_id == user.id)),
+        ).values(
+            status="blocked",
+            shared_themes=[],
+            similarity_score=0.0,
+            safe_explanation="This connection was removed.",
+            updated_at=datetime.now(timezone.utc),
+        ))
         db.commit()
     return {"ok": True}
 
@@ -617,6 +641,8 @@ async def create_post(
             post.image_file = filename
 
     db.add(post)
+    db.flush()
+    analyze_new_post_for_matching(db, post, user)
     db.commit()
     db.refresh(post)
     return single_post_out(db, post, user)
@@ -701,7 +727,11 @@ def create_confession(
     if balloon_color not in BALLOON_COLORS: raise HTTPException(status_code=422, detail="Choose an available balloon colour.")
     if visibility not in {"public", "private"}: raise HTTPException(status_code=422, detail="Choose public or private visibility.")
     post = Post(id=uuid.uuid4(), author_id=user.id, body=content, category=category, mood=mood, is_anonymous=is_anonymous, surface="confession", visibility=visibility, balloon_color=balloon_color)
-    db.add(post); db.commit(); db.refresh(post)
+    db.add(post)
+    db.flush()
+    analyze_new_post_for_matching(db, post, user)
+    db.commit()
+    db.refresh(post)
     return single_post_out(db, post, user)
 
 
@@ -721,7 +751,7 @@ def list_confessions(cursor: str | None = None, limit: int = 24, db: Session = D
 def my_posts(surface: str = "feed", limit: int = 30, db: Session = Depends(get_db), user: User = Depends(current_user)):
     if surface not in {"feed", "confession"}:
         raise HTTPException(status_code=422, detail="Choose feed or confession posts.")
-    size = max(1, min(limit, 50))
+    size = max(1, min(limit, 100))
     rows = db.scalars(select(Post).options(joinedload(Post.author)).where(Post.author_id == user.id, Post.surface == surface).order_by(Post.created_at.desc(), Post.id.desc()).limit(size)).all()
     ids = [p.id for p in rows]
     return FeedOut(posts=[post_to_public(p, reaction_counts_for(db, ids).get(p.id, {}), my_reactions_for(db, user.id, ids).get(p.id), comment_counts_for(db, ids).get(p.id, 0)) for p in rows], next_cursor=None)
@@ -905,9 +935,16 @@ def get_post(
 @app.delete("/posts/{post_id}")
 def delete_post(post_id: uuid.UUID, request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)) -> dict:
     limit(request, "post_delete", max_hits=20, window_seconds=600)
-    post = db.get(Post, post_id)
+    post = db.scalar(select(Post).where(Post.id == post_id).with_for_update())
     if post is None or post.author_id != user.id:
         raise HTTPException(status_code=404, detail="That post is gone.")
+    selected_for_matching = db.scalar(select(SameSkyAnalysis.post_id).where(
+        SameSkyAnalysis.post_id == post.id,
+        SameSkyAnalysis.user_id == user.id,
+    )) is not None
+    same_sky_profile = None
+    if selected_for_matching:
+        same_sky_profile = db.scalar(select(SameSkyProfile).where(SameSkyProfile.user_id == user.id).with_for_update())
     comments = list(db.scalars(select(Comment).where(Comment.post_id == post.id)))
     comment_ids = [comment.id for comment in comments]
     if comment_ids:
@@ -926,12 +963,21 @@ def delete_post(post_id: uuid.UUID, request: Request, db: Session = Depends(get_
     archive_records(db, ReactionHistory, reactions, user.id)
     archive_records(db, NotificationHistory, notifications, user.id)
     archive_records(db, ReportHistory, reports, user.id)
+    db.execute(delete(SameSkyJob).where(
+        SameSkyJob.job_type == "analyze_post",
+        SameSkyJob.payload["post_id"].astext == str(post.id),
+        SameSkyJob.status == "queued",
+    ))
     db.execute(delete(Notification).where(Notification.id.in_([item.id for item in notifications])))
     db.execute(delete(Comment).where(Comment.id.in_([item.id for item in comments])))
     db.execute(delete(Reaction).where(Reaction.id.in_([item.id for item in reactions])))
     db.execute(delete(Report).where(Report.id.in_([item.id for item in reports])))
     image_file = post.image_file
     db.delete(post)
+    db.flush()
+    if same_sky_profile is not None:
+        update_eligibility(db, same_sky_profile)
+        invalidate_matches(db, user.id)
     db.commit()
     if image_file:
         remove_file(POSTS_DIR / image_file)

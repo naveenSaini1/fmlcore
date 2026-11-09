@@ -166,6 +166,7 @@ class NotificationOut(BaseModel):
     is_anonymous: bool
     post_id: uuid.UUID | None
     comment_id: uuid.UUID | None
+    same_sky_match_id: uuid.UUID | None
     is_read: bool
     created_at: datetime
 
@@ -222,6 +223,94 @@ class ReportIn(BaseModel):
         if len(cleaned) > 500:
             raise ValueError("Keep report details under 500 characters.")
         return cleaned
+
+
+class SameSkyProfileUpdate(BaseModel):
+    timezone: str = Field(min_length=1, max_length=64)
+    matching_enabled: bool
+    preferred_categories: list[str] = Field(default_factory=list, max_length=10)
+
+    @field_validator("timezone")
+    @classmethod
+    def timezone_not_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Choose a valid timezone.")
+        return cleaned
+
+    @field_validator("preferred_categories")
+    @classmethod
+    def preferences_ok(cls, value: list[str]) -> list[str]:
+        from app.taxonomy import CATEGORY_SET
+        if len(value) != len(set(value)) or any(item not in CATEGORY_SET for item in value):
+            raise ValueError("Choose up to ten unique experience categories.")
+        return value
+
+
+class SameSkyMatchResponseIn(BaseModel):
+    accept: bool
+
+
+class SameSkyAnalysisOut(BaseModel):
+    post_id: uuid.UUID
+    entry_type: str
+    title: str
+    description: str
+    category: str
+    mood: str | None
+    processing_status: str
+    duplicate_status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class SameSkyPublicPersonOut(BaseModel):
+    id: uuid.UUID
+    username: str
+    bio: str
+    profile_color: str
+    profile_sticker: str
+    avatar_url: str | None
+
+
+class SameSkyMatchOut(BaseModel):
+    id: uuid.UUID
+    status: str
+    person: SameSkyPublicPersonOut
+    shared_themes: list[str]
+    safe_explanation: str
+    you_accepted: bool
+    they_accepted: bool
+    created_at: datetime
+
+
+class SameSkyAttemptOut(BaseModel):
+    id: uuid.UUID
+    status: str
+    candidates_evaluated: int
+    match_id: uuid.UUID | None
+    started_at: datetime
+    completed_at: datetime | None
+
+
+class SameSkyProfileOut(BaseModel):
+    analyses: list[SameSkyAnalysisOut]
+    matches: list[SameSkyMatchOut]
+    declined_matches: list[SameSkyMatchOut]
+    latest_attempt: SameSkyAttemptOut | None
+    latest_match_status: str | None
+    experience_count: int
+    confession_count: int
+    ready_experience_count: int
+    ready_confession_count: int
+    required_experiences: int
+    required_confessions: int
+    eligibility_status: str
+    matching_enabled: bool
+    preferred_categories: list[str]
+    timezone: str
+    last_attempt_at: datetime | None
+    next_attempt_at: datetime | None
 
 
 CommentOut.model_rebuild()

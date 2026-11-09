@@ -60,6 +60,7 @@ def queue_notification(
                 kind=kind,
                 post_id=post_id,
                 comment_id=comment_id,
+                same_sky_match_id=None,
                 actor_anonymous=actor_anonymous,
             )
         )

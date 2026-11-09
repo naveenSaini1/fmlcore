@@ -15,7 +15,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" data-theme="system">
+    <html lang="en" data-theme="acid-lime">
       <body className={`${syne.variable} ${outfit.variable} ${caveat.variable} antialiased`}>
         <ThemeProvider>
           <SiteHeaderShell />

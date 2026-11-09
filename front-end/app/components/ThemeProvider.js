@@ -1,14 +1,15 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { getMe, updateTheme } from "../../lib/api";
+import { getMe, getPlatformDefaultTheme, updateTheme } from "../../lib/api";
 import { isThemeKey } from "../../lib/themes";
 
 const ThemeContext = createContext(null);
 const GUEST_THEME_KEY = "fmlcore-guest-theme";
+const DEFAULT_THEME = "acid-lime";
 
 export function ThemeProvider({ children }) {
-  const [theme, setThemeState] = useState("system");
+  const [theme, setThemeState] = useState(DEFAULT_THEME);
   const [userId, setUserId] = useState(null);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -25,17 +26,19 @@ export function ThemeProvider({ children }) {
 
     let alive = true;
     async function syncAccountTheme() {
+      const platformTheme = await getPlatformDefaultTheme().then((result) => result.theme).catch(() => DEFAULT_THEME);
+      if (!alive) return;
       try {
         const user = await getMe();
         if (!alive) return;
         setUserId(user.id);
-        const accountTheme = isThemeKey(user.theme) ? user.theme : "system";
+        const accountTheme = isThemeKey(user.theme) ? user.theme : platformTheme;
         setThemeState(accountTheme);
         document.documentElement.dataset.theme = accountTheme;
       } catch {
         if (!alive) return;
         setUserId(null);
-        const localTheme = isThemeKey(guestTheme) ? guestTheme : "system";
+        const localTheme = isThemeKey(guestTheme) ? guestTheme : platformTheme;
         setThemeState(localTheme);
         document.documentElement.dataset.theme = localTheme;
       } finally {
