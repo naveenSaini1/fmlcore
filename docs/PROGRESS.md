@@ -1,85 +1,88 @@
 # FMLCore — build progress & handoff
 
-**Version:** 0.9.0 · **Current stage:** 9-1 implemented; live matching verification pending · **Next:** Stage 9-2 (matched-user chat)
+**Version:** 0.9.1 · **Current stage:** 9-1 complete (instant match, event-driven worker, admin worker control) · **Next:** Stage 9-2 (matched-user chat)
 
 This file is the pick-up point for anyone (human or AI) continuing the build. Read
 [fmlcore-vision.md](fmlcore-vision.md) for product intent and [../CHANGELOG.md](../CHANGELOG.md)
 for the per-version log.
 
-## Current handoff — 8 November 2026
+## Current handoff — 9 November 2026
 
 ### What is running
 
-The local development stack is currently running from `/home/naveen/Desktop/fmlcore`:
+The local development stack runs from `/home/naveen/Desktop/fmlcore`:
 
-- Next.js dev server: `http://localhost:3000` (`/same-sky` returns HTTP 200).
-- FastAPI: `http://127.0.0.1:8000` (`/health` returns HTTP 200).
-- Same Sky worker is currently paused after the billing issue. Start it only when
-  ready to send queued/new stories to the configured AI providers.
-- PostgreSQL: Docker container `fmlcore-db`; it accepts connections. Startup reports a
-  PostgreSQL collation-version mismatch warning (database recorded 2.41, host provides
-  2.36); it has not prevented connections in this development session.
+- Next.js dev server: `http://localhost:3000`
+- Admin console: `http://localhost:3001` (owner-only, authenticated)
+- FastAPI: `http://127.0.0.1:8000`
+- PostgreSQL: Docker container `fmlcore-db` on port 5433
+- Same Sky worker: **not auto-started** — start it from the admin console (`http://localhost:3001`)
+  or run `cd backend && .venv/bin/python -m app.same_sky_worker`
 
 Check those processes before restarting anything. Local configuration is in the ignored
 `backend/.env`; never copy its values into source files, commits, prompts, or handoff notes.
 
-### Same Sky status and next debugging step
+### How Same Sky works (v0.9.1)
 
-Each newly created post/confession is saved normally and queues one analysis job in the
-same database transaction. The worker then saves structured analysis and an embedding
-linked to that post. “Start matching” compares only those saved results. An earlier test
-queued story analysis and encountered Gemini `503` and `429` errors. The worker remains
-paused after the billing issue; queued stories will not be sent until it is started.
-Check aggregate job states before starting it.
+#### Step 1 — Post analysis (`analyze_post` job, background worker)
 
-No completed `SameSkyAttempt` / `no_match` result was recorded at the last check. The
-one-minute local cooldown starts only after a completed search finds no match. It has
-therefore not started merely because matching was clicked. The account's current
-processing/appeal state may have advanced since that check; query the database before
-describing it as pending or complete. Never print or inspect selected story text for a
-status check.
+When a user includes a post or confession in Same Sky, one `analyze_post` job is inserted
+into `same_sky_jobs` in the same DB transaction. The background worker picks it up:
 
-Analysis is queued automatically for every new post/confession; eligibility counts only
-successfully analyzed stories. The search action reads existing analysis and embeddings,
-then compares candidates locally. The no-match state starts its timer only after a
-completed search. The worker remains paused until the owner is ready to process new
-stories.
+1. Sends post text to the configured AI provider → extracts themes, emotion, safe summary,
+   copy signal, and risk flags.
+2. Generates a 768-dimension pgvector embedding via Gemini.
+3. Runs a near-duplicate check (cosine distance ≥ 0.94 triggers an AI copy comparison).
+4. Saves themes + embedding to `same_sky_analysis` / `same_sky_embeddings`.
+5. Sets `processing_status = "ready"` — post now counts toward eligibility.
 
-Provider and worker fixes already made:
+The worker is **event-driven via PostgreSQL LISTEN/NOTIFY** (`LISTEN same_sky_jobs`).
+It wakes only when a new job is inserted — zero idle CPU, zero idle DB queries.
+Start/stop it from the admin console (`http://localhost:3001`) or run:
 
-- Gemini structured-output schema no longer sends unsupported `additionalProperties`.
-- Gemini embedding requests pass the provider identifier required by the shared HTTP
-  helper.
-- AI requests use an FMLCore user agent, provider-specific request gaps, and honor
-  `Retry-After` when provided.
-- Transient failures use exponential backoff, with at most six job attempts; permanent
-  client errors are not retried.
-- The admin-selected provider analyzes new posts/confessions; Gemini supplies
-  768-dimensional embeddings. Backend exact and near-duplicate validation uses the
-  saved fingerprint/vector and selected-provider pair comparison. A synthetic analysis and embedding-dimension check succeeded
-  earlier, but this does not establish that the current user's stories were analyzed.
+```
+cd backend && .venv/bin/python -m app.same_sky_worker
+```
 
-Useful checks for the next developer:
+#### Step 2 — Match search (inline in HTTP request, no queue)
 
-1. Inspect aggregate entry and job status, retry counts, and sanitized error codes/timing.
-   Do not log post text, confession text, API keys, or full provider request bodies.
-2. Verify provider rate limits and service status, then allow the worker's scheduled
-   retries to proceed before enqueuing duplicate work.
-3. Confirm every required entry reaches a successful analysis and the UI shows 100% with
-   the enabled Start Matching action.
-4. Only after the backend creates and completes a search attempt can the UI truthfully
-   show a match or start the configured no-match timer.
+When a user clicks "Start Matching", `POST /same-sky/attempts` calls `_find_match()`
+directly and returns a terminal result immediately — no polling, no job queue:
 
-Main implementation files are `front-end/app/same-sky/page.js` and
-`front-end/lib/api.js`; backend routes and logic are in `backend/app/same_sky_api.py`,
-`same_sky_ai.py`, `same_sky_matching.py`, `same_sky_common.py`, and
-`same_sky_worker.py`. Schema and configuration live in `backend/app/models.py`,
-`backend/app/config.py`, and `backend/migrations/`.
+1. Builds an exclusion list: already-matched users, blocked/blocking users, self.
+2. For each of the user's ready posts, runs a pgvector cosine-distance search → top 180
+   nearest posts from other eligible users.
+3. Scores each candidate: combined similarity + shared-theme bonus + category-preference
+   bonus. Candidates below the threshold are discarded.
+4. Creates a `SameSkyMatch` row for the best candidate, or records `no_match`.
+5. Returns `{ status, match_id, next_attempt_at }` immediately in the HTTP response.
 
-The API key values were pasted into chat during setup. Treat those credentials as
-exposed: revoke/rotate them in their provider consoles and update only the ignored local
-environment file before relying on them. Do not preserve the exposed values in these
-docs.
+> **Why no job queue for matching?** It is a pure local pgvector operation — under 50 ms.
+> Only slow external AI calls go through the job queue.
+
+#### `same_sky_jobs` table — `analyze_post` only going forward
+
+| `job_type` | Still created? | Handled by |
+|---|---|---|
+| `analyze_post` | ✅ Yes — every included post/confession | Background worker |
+| `find_match` | ❌ Removed in v0.9.1 | Inline in HTTP request |
+
+Historical `find_match` rows remain in the table. The worker handler for `find_match`
+has been removed from the codebase.
+
+#### Admin worker control (`http://localhost:3001`)
+
+The admin console has a **Background Worker** card:
+- Live status badge: `● RUNNING (PID xxxxx)` or `○ STOPPED`
+- **Turn ON / Turn OFF** — spawns or kills the real OS worker process
+- **Process Backlog (N)** — runs all queued `analyze_post` jobs synchronously in one shot
+
+API endpoints: `GET /admin/worker/status`, `POST /admin/worker/start|stop|process-batch`
+
+Main implementation files: `front-end/app/same-sky/page.js`, `front-end/lib/api.js`,
+`backend/app/same_sky_api.py`, `same_sky_ai.py`, `same_sky_matching.py`,
+`same_sky_common.py`, `same_sky_worker.py`, `worker_control.py`.
+Schema and config: `backend/app/models.py`, `backend/app/config.py`, `backend/migrations/`.
 
 ### Database and retry configuration
 

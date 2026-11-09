@@ -365,8 +365,6 @@ def _handle(job: SameSkyJob) -> None:
     payload = job.payload or {}
     if job.job_type == "analyze_post":
         _analyze_post(uuid.UUID(payload["post_id"]), payload["provider"])
-    elif job.job_type == "find_match":
-        _find_match(uuid.UUID(payload["attempt_id"]))
     else:
         raise RuntimeError("Unknown Same Sky background job.")
 
@@ -446,12 +444,6 @@ def process_one_job() -> bool:
                             ).with_for_update())
                             if profile:
                                 update_eligibility(db, profile)
-                    elif job.job_type == "find_match":
-                        attempt_id = (job.payload or {}).get("attempt_id")
-                        attempt = db.get(SameSkyAttempt, uuid.UUID(attempt_id)) if attempt_id else None
-                        if attempt:
-                            attempt.status = "unavailable"
-                            attempt.completed_at = datetime.now(timezone.utc)
                 else:
                     job.status = "queued"
                     backoff = min(30 * (2 ** job.attempts), 1800)
