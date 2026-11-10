@@ -35,6 +35,7 @@ def to_public(user: User) -> UserOut:
         profile_color=user.profile_color,
         profile_sticker=user.profile_sticker,
         theme=user.theme,
+        skin=user.skin if user.skin in {"calm", "social", "after-hours", "frappe", "common-ground"} else "calm",
         avatar_url=avatar_url,
         joined_at=user.created_at,
     )

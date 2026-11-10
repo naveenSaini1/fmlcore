@@ -3,6 +3,28 @@
 All notable changes to FMLCore. Versions track build stages as `0.<stage>.<patch>`.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
+## [Unreleased] — 2026-11-10
+
+### Added
+- Skin Studio at `/settings/appearance`, with preview/apply/cancel, a persistent
+  account preference, guest caching, and five skins: Calm Chaos (Poppins),
+  Social Classic, After Hours, Frappe, and the original Common Ground design.
+- Shared skin treatments for navigation, typography, story cards, forms,
+  profiles, discovery, chat, and Confession Sky controls. Editorial and Digital
+  Nostalgia were removed; legacy selections fall back to Calm Chaos.
+- Leaderboard navigation for guests and signed-in users.
+- In-progress Stage 9-2 chat and WebSocket modules, conversation/message/receipt
+  persistence, chat UI, and Same Sky connection integration. Chat still needs
+  the authorization, safety, and production-transport follow-ups documented in
+  `docs/PROGRESS.md` before being treated as release-ready.
+
+### Operations
+- Run `alembic upgrade head` before using this snapshot; the migration head is
+  `20261110_0912` (chat tables followed by the user skin preference).
+- Use `NEXT_BUILD_DIR=.next-verify npm run build` for local verification to
+  avoid overwriting a running development server's generated manifests.
+- Chat auto-scroll now scrolls the message pane without moving the page header.
+
 ## [0.9.0] — 2026-11-06 — Stage 9-1: Same Sky matching
 
 ### Added

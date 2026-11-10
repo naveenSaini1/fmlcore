@@ -92,7 +92,7 @@ export default function NotificationsPage() {
         ) : null}
         <div className="space-y-3">
           {items.map((item) => (
-            <article key={item.id} className={`border-4 border-ink p-4 ${item.is_read ? "bg-white" : "bg-purple text-on-brand"}`}>
+            <article key={item.id} className={`notification-card border-4 border-ink p-4 ${item.is_read ? "bg-white" : "bg-purple text-on-brand"}`}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-bold">{notificationCopy(item)}</p>

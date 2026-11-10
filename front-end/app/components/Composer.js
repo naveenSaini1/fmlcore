@@ -88,7 +88,7 @@ export default function Composer({ user, onCreated }) {
   const chip = "border-2 border-ink px-2.5 py-1 text-xs font-extrabold transition-transform active:translate-y-0.5";
 
   return (
-    <form onSubmit={onSubmit} className="border-4 border-ink bg-lime p-5 shadow-[8px_8px_0_var(--color-shadow)]">
+    <form onSubmit={onSubmit} className="story-composer border-4 border-ink bg-lime p-5 shadow-[8px_8px_0_var(--color-shadow)]">
       <p className="font-note text-3xl leading-none">what happened this time?</p>
       <p className="mt-2 text-xs font-semibold text-on-brand/75">New posts are analyzed privately for Same Sky using the provider selected by the platform. A match sees shared themes, never your original post.</p>
 

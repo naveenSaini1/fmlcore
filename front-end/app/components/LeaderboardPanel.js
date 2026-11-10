@@ -18,7 +18,7 @@ export default function LeaderboardPanel() {
   }, []);
 
   return (
-    <aside className="h-fit border-4 border-ink bg-soft-purple p-4 shadow-[6px_6px_0_var(--color-shadow)] md:sticky md:top-24">
+    <aside className="community-panel h-fit border-4 border-ink bg-soft-purple p-4 shadow-[6px_6px_0_var(--color-shadow)] md:sticky md:top-24">
       <p className="font-note text-xl leading-none">weekly reactions</p>
       <h2 className="font-display text-2xl font-extrabold">Top Painer</h2>
       <p className="mt-1 text-xs font-bold text-ink/70">Posts people related to most this week.</p>

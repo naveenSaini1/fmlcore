@@ -90,10 +90,10 @@ export default function Explore({ user }) {
   const promptHref = user && prompt ? `/?prompt=${encodeURIComponent(prompt.prompt)}` : "/signup";
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <main className="explore-page mx-auto max-w-6xl px-4 py-8">
+      <div className="discovery-layout grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="min-w-0">
-      <header className="mb-7">
+      <header className="page-introduction mb-7">
         <p className="font-note text-3xl leading-none">take a left turn</p>
         <h1 className="font-display text-5xl font-extrabold leading-[0.9] tracking-tight md:text-6xl">
           Explore the weird.
@@ -101,15 +101,15 @@ export default function Explore({ user }) {
         <p className="mt-3 max-w-xl text-lg font-semibold">Find a story that feels familiar, or one you never saw coming.</p>
       </header>
 
-      <section className="mb-8 grid gap-4 md:grid-cols-[1fr_auto]">
-        <div className="border-4 border-ink bg-lime p-5 text-on-brand shadow-[6px_6px_0_var(--color-shadow)]">
+      <section className="discovery-prompts mb-8 grid gap-4 md:grid-cols-[1fr_auto]">
+        <div className="daily-prompt border-4 border-ink bg-lime p-5 text-on-brand shadow-[6px_6px_0_var(--color-shadow)]">
           <p className="font-display text-xs font-extrabold uppercase tracking-widest">Today&apos;s prompt · {prompt?.date ?? "…"}</p>
           <h2 className="mt-2 font-note text-4xl leading-none">{prompt?.prompt ?? "Loading today's thought…"}</h2>
           <Link href={promptHref} className="mt-4 inline-block border-2 border-ink bg-ink px-3 py-2 text-sm font-extrabold text-on-ink">
             {user ? "Use this prompt" : "Join to write about it"}
           </Link>
         </div>
-        <div className="flex min-w-52 flex-col justify-between border-4 border-ink bg-purple p-5 text-on-brand shadow-[6px_6px_0_var(--color-shadow)]">
+        <div className="random-prompt flex min-w-52 flex-col justify-between border-4 border-ink bg-purple p-5 text-on-brand shadow-[6px_6px_0_var(--color-shadow)]">
           <p className="font-note text-2xl leading-none">one story, picked at random</p>
           <button
             type="button"
@@ -142,7 +142,7 @@ export default function Explore({ user }) {
           ) : null}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-end gap-3 border-4 border-ink bg-white p-4">
+        <div className="story-filters mt-4 flex flex-wrap items-end gap-3 border-4 border-ink bg-white p-4">
           <label className="flex flex-col gap-1 text-xs font-extrabold uppercase tracking-wide">
             Category
             <select value={category} onChange={(event) => setCategory(event.target.value)} className="min-w-48 border-2 border-ink bg-paper px-3 py-2 text-sm font-bold normal-case tracking-normal">
@@ -165,7 +165,7 @@ export default function Explore({ user }) {
           ) : null}
         </div>
 
-        <div className="mt-6 space-y-6">
+        <div className="story-list mt-6 space-y-6">
           {status === "loading" ? <p className="font-note text-3xl leading-none">looking around…</p> : null}
           {status === "error" ? (
             <div className="border-4 border-ink bg-coral p-4 font-bold text-on-brand" role="alert">

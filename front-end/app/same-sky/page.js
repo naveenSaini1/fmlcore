@@ -18,8 +18,7 @@ import {
 const button = "border-2 border-ink bg-white px-3 py-2 text-sm font-extrabold shadow-[3px_3px_0_var(--color-shadow)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50";
 const primary = "border-2 border-ink bg-lime px-4 py-3 font-extrabold shadow-[4px_4px_0_var(--color-shadow)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50";
 
-function MatchCard({ match, onRespond, busy, onBlock, onReport }) {
-  const [reported, setReported] = useState(false);
+function MatchCard({ match, onRespond, busy }) {
   return (
     <article className={`border-4 border-ink p-5 shadow-[6px_6px_0_var(--color-shadow)] ${match.status === "connected" ? "bg-lime" : "bg-soft-purple"}`}>
       <div className="flex items-center gap-3">
@@ -29,10 +28,19 @@ function MatchCard({ match, onRespond, busy, onBlock, onReport }) {
       <p className="mt-4 text-sm">{match.safe_explanation}</p>
       {match.they_accepted && !match.you_accepted ? <p className="mt-3 border-2 border-ink bg-lime px-3 py-2 text-sm font-extrabold">They’re open to connecting with you.</p> : null}
       <div className="mt-3 flex flex-wrap gap-2">{match.shared_themes.map((theme) => <span key={theme} className="border border-ink bg-white px-2 py-1 text-xs font-extrabold">{theme}</span>)}</div>
-      {match.status === "connected" ? <p className="mt-4 border-t-2 border-ink/30 pt-3 text-sm font-extrabold">Chat comes in Stage 9-2. You are not expected to continue or share anything more.</p> : (
+      {match.status === "connected" ? (
+        <div className="mt-4 border-t-2 border-ink/30 pt-3">
+          <p className="text-sm font-extrabold">You are both under the same sky. You can now chat in private.</p>
+          <Link
+            href={`/chat?conversation=${match.conversation_id || ""}`}
+            className={`${primary} mt-3 inline-block`}
+          >
+            OPEN CHAT →
+          </Link>
+        </div>
+      ) : (
         <div className="mt-5 flex flex-wrap gap-2"><button className={primary} onClick={() => onRespond(match.id, true)} disabled={busy || match.you_accepted}>{match.you_accepted ? "REQUEST SENT · WAITING" : "I'M OPEN TO THIS"}</button><button className={button} onClick={() => onRespond(match.id, false)} disabled={busy}>Pass</button></div>
       )}
-      <div className="mt-4 flex flex-wrap gap-3 border-t border-ink/25 pt-3 text-xs font-bold"><button className="underline" disabled={busy} onClick={() => onBlock(match.person)}>Block @{match.person.username}</button><button className="underline" disabled={busy || reported} onClick={async () => { await onReport(match); setReported(true); }}>{reported ? "Reported" : "Report"}</button></div>
     </article>
   );
 }
@@ -249,7 +257,7 @@ export default function SameSkyPage() {
 
       {["no_match", "match_declined", "match_unavailable"].includes(flowStatus) ? <motion.section initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="relative mt-7 overflow-hidden border-4 border-ink bg-gradient-to-br from-[#ffe2c6] via-[#ffb9a7] to-[#f7c3dc] p-6 text-center shadow-[7px_7px_0_var(--color-shadow)] sm:p-9"><span className="pointer-events-none absolute -right-3 top-2 rotate-12 text-7xl text-white/45" aria-hidden>✦</span><span className="pointer-events-none absolute bottom-1 left-4 -rotate-12 text-5xl text-white/45" aria-hidden>✧</span><motion.div className="relative mx-auto grid h-16 w-16 place-items-center rounded-full border-2 border-ink bg-[#fff4d8] text-3xl text-[#ef594d] shadow-[3px_3px_0_var(--color-shadow)]" animate={reduceMotion ? undefined : { rotate: [0, 12, -12, 0], scale: [1, 1.08, 1] }} transition={{ duration: 3, repeat: Infinity }}>☄</motion.div><p className="relative mt-4 font-note text-3xl">your orbit is still unfolding.</p><h2 className="relative mt-1 font-display text-3xl font-extrabold">{flowStatus === "match_declined" ? "THAT CONNECTION CLOSED" : flowStatus === "match_unavailable" ? "CONNECTION NO LONGER AVAILABLE" : "NO MATCH FOUND"}</h2><p className="relative mt-2">{flowStatus === "match_declined" ? "They passed on the connection. You can look for someone new." : flowStatus === "match_unavailable" ? "That connection ended. You can look for someone new." : "Your next try unlocks in"}</p><strong className="relative mt-1 inline-block rounded-full border-2 border-ink bg-[#fff8ed]/80 px-5 py-2 font-display text-2xl tabular-nums shadow-[3px_3px_0_var(--color-shadow)]">{cooldownSeconds > 0 ? cooldownLabel : "READY WHEN YOU ARE"}</strong>{cooldownSeconds > 0 ? <p className="relative mt-2 text-xs font-semibold">Come back when the timer reaches zero.</p> : null}<button className={`${primary} relative mt-4`} onClick={startMatching} disabled={busy || cooldownSeconds > 0}>{busy ? "SEARCHING…" : cooldownSeconds > 0 ? "TRY AGAIN SOON" : "TRY AGAIN"}</button></motion.section> : null}
 
-      {activeMatches.length ? <section className="mt-8"><p className="font-note text-2xl">one possible connection at a time</p><h2 className="font-display text-3xl font-extrabold">UNDER THE SAME SKY</h2><div className="mt-4 grid gap-4 md:grid-cols-2">{activeMatches.map((match) => <MatchCard key={match.id} match={match} onRespond={respond} busy={busy} onBlock={blockPerson} onReport={reportMatch} />)}</div></section> : null}
+      {activeMatches.length ? <section className="mt-8"><p className="font-note text-2xl">one possible connection at a time</p><h2 className="font-display text-3xl font-extrabold">UNDER THE SAME SKY</h2><div className="mt-4 grid gap-4 md:grid-cols-2">{activeMatches.map((match) => <MatchCard key={match.id} match={match} onRespond={respond} busy={busy} />)}</div></section> : null}
 
       {profile.declined_matches?.length ? <section className="mt-8"><p className="font-note text-2xl">some connections pause here</p><h2 className="font-display text-3xl font-extrabold">PAST REQUESTS</h2><p className="mt-1 text-sm">Only requests you declined appear here. Reopening lets the other person send a fresh request.</p><div className="mt-4 grid gap-3">{profile.declined_matches.map((match) => <DeclinedRequestCard key={match.id} match={match} onReopen={reopenRequest} busy={busy} />)}</div></section> : null}
 

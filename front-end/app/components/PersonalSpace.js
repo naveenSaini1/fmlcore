@@ -1,7 +1,7 @@
 import Feed from "./Feed";
 
 export default function PersonalSpace({ user }) {
-  return <main className="mx-auto max-w-3xl px-4 py-8">
+  return <main className="personal-space mx-auto max-w-3xl px-4 py-8">
     <div className="mb-6 w-full">
       <p className="font-note text-3xl leading-none">hey @{user.username}</p>
       <h1 className="font-display text-4xl font-extrabold leading-none">Your space</h1>

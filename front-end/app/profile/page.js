@@ -106,8 +106,8 @@ export default function ProfilePage() {
           initial={reduce ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 220, damping: 22 }}
-          className="h-fit border-4 border-ink p-4 text-on-brand shadow-[6px_6px_0_var(--color-shadow)]"
-          style={{ backgroundColor: profileColor(color) }}
+          className="profile-identity h-fit border-4 border-ink p-4 text-on-brand shadow-[6px_6px_0_var(--color-shadow)]"
+          style={{ backgroundColor: profileColor(color), "--profile-accent": profileColor(color) }}
         >
           <div className="relative flex h-40 items-center justify-center border-4 border-ink bg-paper">
             {avatar ? (
@@ -151,7 +151,7 @@ export default function ProfilePage() {
             <legend className="font-display text-xs font-extrabold uppercase tracking-wide">Profile color</legend>
             <div className="mt-2 flex flex-wrap gap-2">
               {PROFILE_COLORS.map((item) => (
-                <button key={item.key} type="button" aria-pressed={color === item.key} onClick={() => setColor(item.key)} className={`border-2 border-ink px-3 py-2 text-sm font-extrabold text-on-brand ${color === item.key ? "ring-2 ring-ink ring-offset-2" : ""}`} style={{ backgroundColor: item.value }}>
+                <button key={item.key} type="button" aria-pressed={color === item.key} onClick={() => setColor(item.key)} className={`profile-color-choice border-2 border-ink px-3 py-2 text-sm font-extrabold text-on-brand ${color === item.key ? "ring-2 ring-ink ring-offset-2" : ""}`} style={{ backgroundColor: item.value }}>
                   {item.label}
                 </button>
               ))}

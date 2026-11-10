@@ -61,6 +61,7 @@ from app.schemas import (
     ProfileIn,
     ReactionIn,
     ReportIn,
+    SkinIn,
     SafetyUserOut,
     SafetyUsersOut,
     SignupIn,
@@ -79,6 +80,8 @@ from app.taxonomy import CATEGORIES, CATEGORY_SET, MOOD_KEYS, MOOD_SET, REACTION
 from app.users import find_by_email, find_by_username, remove_file, sniff_image, to_public
 from app.same_sky_api import include_post_for_matching, router as same_sky_router
 from app.admin_api import router as admin_router
+from app.websocket import ws_endpoint_router
+from app.chat import chat_router
 from app.same_sky_common import invalidate_matches, update_eligibility
 from app.system_settings import default_theme
 
@@ -105,6 +108,8 @@ def archive_records(db: Session, history_model, rows: list, deleted_by: uuid.UUI
 app = FastAPI(title="FMLCore", version="0.9.0")
 app.include_router(same_sky_router)
 app.include_router(admin_router)
+app.include_router(chat_router)
+app.include_router(ws_endpoint_router)
 
 DAILY_PROMPTS = [
     "What's the plot twist today?",
@@ -562,6 +567,21 @@ def update_theme(
 ):
     limit(request, "theme_update", max_hits=60, window_seconds=3600)
     user.theme = body.theme
+    db.commit()
+    db.refresh(user)
+    return to_public(user)
+
+
+@app.patch("/profile/skin", response_model=UserOut)
+def update_skin(
+    body: SkinIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    """Persist a person's Skin Studio choice without changing their palette."""
+    limit(request, "skin_update", max_hits=60, window_seconds=3600)
+    user.skin = body.skin
     db.commit()
     db.refresh(user)
     return to_public(user)

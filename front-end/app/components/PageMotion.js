@@ -16,7 +16,7 @@ export function PageMotion({ children }) {
         animate={{ opacity: 1, y: 0 }}
         exit={reduce ? undefined : { opacity: 0, y: -5 }}
         transition={{ duration: reduce ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
-        className="min-h-screen"
+        className="app-content min-h-screen"
       >
         {children}
       </motion.div>
