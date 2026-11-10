@@ -34,6 +34,7 @@ class User(Base):
     profile_color: Mapped[str] = mapped_column(String(20), default="lime", server_default="lime")
     profile_sticker: Mapped[str] = mapped_column(String(20), default="star", server_default="star")
     theme: Mapped[str] = mapped_column(String(30), default="acid-lime", server_default="acid-lime")
+    skin: Mapped[str] = mapped_column(String(30), default="calm", server_default="calm", nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -295,3 +296,109 @@ class SameSkyJob(Base):
     last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ChatConversation(Base):
+    __tablename__ = "chat_conversations"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    same_sky_match_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("same_sky_matches.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
+    conversation_type: Mapped[str] = mapped_column(String(32), default="same_sky", server_default="same_sky")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    last_message_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+    participants: Mapped[list["ChatParticipant"]] = relationship(
+        "ChatParticipant",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="ChatParticipant.created_at",
+    )
+    messages: Mapped[list["ChatMessage"]] = relationship(
+        "ChatMessage",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="ChatMessage.created_at",
+    )
+
+
+class ChatParticipant(Base):
+    __tablename__ = "chat_participants"
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "user_id", name="uq_chat_participant_conv_user"),
+        Index("ix_chat_participants_user_conv", "user_id", "conversation_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("chat_conversations.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    muted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    conversation: Mapped["ChatConversation"] = relationship("ChatConversation", back_populates="participants")
+    user: Mapped["User"] = relationship("User")
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    __table_args__ = (
+        Index("ix_chat_messages_conv_created", "conversation_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("chat_conversations.id", ondelete="CASCADE"), index=True
+    )
+    sender_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    message_type: Mapped[str] = mapped_column(String(32), default="text", server_default="text")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    conversation: Mapped["ChatConversation"] = relationship("ChatConversation", back_populates="messages")
+    sender: Mapped["User"] = relationship("User")
+    receipts: Mapped[list["ChatMessageReceipt"]] = relationship(
+        "ChatMessageReceipt", back_populates="message", cascade="all, delete-orphan"
+    )
+
+
+class ChatMessageReceipt(Base):
+    __tablename__ = "chat_message_receipts"
+    __table_args__ = (
+        UniqueConstraint("message_id", "user_id", name="uq_chat_receipt_msg_user"),
+        Index("ix_chat_receipts_user_read", "user_id", "read_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("chat_messages.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    message: Mapped["ChatMessage"] = relationship("ChatMessage", back_populates="receipts")
+    user: Mapped["User"] = relationship("User")
+# End chat persistence models.

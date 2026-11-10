@@ -125,6 +125,10 @@ Do one stage at a time. Wait for an explicit yes and a stage number before writi
 10. Real-time reactions, comments, and in-app notifications via WebSockets.
 11. Email notifications for reactions and comments on a user's posts.
 12. Social voice rooms and full voice meeting rooms (future stage; deferred for now).
+13. Skin Studio: five complete visual skins—Calm Chaos, Social
+Classic, After Hours, Frappe, and Common Ground—built on one shared application,
+data model, and feature set. Presentation may change; product behavior and
+permissions may not. See `SKIN_STUDIO.md`.
 
 Later: milestones and richer customization.
 
@@ -136,4 +140,4 @@ Stages 0 (shell and tokens), 1 (accounts and profile), 2 (feed and posts), and 3
 
 Stages 0–8 and 9-1 are complete. Stage 9-2 (matched-user chat) is next. Voice rooms remain in deferred Stage 12. See `docs/PROGRESS.md` for the roadmap and handoff state.
 
-The completed Stage 9-1 requirements and planned requirements for matched-user chat (Stage 9-2), real-time WebSockets (Stage 10), email notifications (Stage 11), and the combined social voice rooms/full meeting-room experience (Stage 12) are recorded in `docs/PROGRESS.md`. Obtain explicit approval for each remaining stage before implementation.
+The completed Stage 9-1 requirements and planned requirements for matched-user chat (Stage 9-2), real-time WebSockets (Stage 10), email notifications (Stage 11), the combined social voice rooms/full meeting-room experience (Stage 12), and Skin Studio (Stage 13) are recorded in `docs/PROGRESS.md`. Obtain explicit approval for each remaining stage before implementation.

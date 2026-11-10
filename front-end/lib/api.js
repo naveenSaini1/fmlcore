@@ -61,6 +61,10 @@ export function updateTheme(theme) {
   return api("/profile/theme", { method: "PATCH", body: JSON.stringify({ theme }) });
 }
 
+export function updateSkin(skin) {
+  return api("/profile/skin", { method: "PATCH", body: JSON.stringify({ skin }) });
+}
+
 export function uploadAvatar(file) {
   const body = new FormData();
   body.append("file", file);

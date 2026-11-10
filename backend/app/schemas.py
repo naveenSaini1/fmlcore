@@ -52,6 +52,17 @@ class ThemeIn(BaseModel):
         return value
 
 
+class SkinIn(BaseModel):
+    skin: str
+
+    @field_validator("skin")
+    @classmethod
+    def skin_ok(cls, value: str) -> str:
+        if value not in {"calm", "social", "after-hours", "frappe", "common-ground"}:
+            raise ValueError("Choose one of the available skins.")
+        return value
+
+
 class ProfileIn(BaseModel):
     username: str
     bio: str = ""
@@ -97,6 +108,7 @@ class UserOut(BaseModel):
     profile_color: str
     profile_sticker: str
     theme: str
+    skin: str
     avatar_url: str | None
     joined_at: datetime
 
@@ -281,6 +293,7 @@ class SameSkyMatchOut(BaseModel):
     safe_explanation: str
     you_accepted: bool
     they_accepted: bool
+    conversation_id: uuid.UUID | None = None
     created_at: datetime
 
 

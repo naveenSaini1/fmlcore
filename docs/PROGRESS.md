@@ -8,6 +8,27 @@ for the per-version log.
 
 ## Current handoff — 9 November 2026
 
+### Snapshot update — 10 November 2026
+
+The repository now contains Stage 13 Skin Studio and the existing, in-progress
+Stage 9-2 chat/WebSocket implementation. Skin Studio includes Calm Chaos,
+Social Classic, After Hours, Frappe, and Common Ground, plus Leaderboard in the
+main navigation. The requested `/` Your Space/Profile/Skins navigation change
+has not started; the owner requested a branch/merge checkpoint first.
+
+Frontend production builds and Python compilation pass. Skin presentation was
+checked with local API fixtures across desktop, tablet, and phone sizes;
+account skin persistence was checked with a rolled-back local DB transaction.
+These checks do not certify live chat or Same Sky provider delivery.
+
+Remaining chat work from the repository review: validate connected-match and
+block state on every read/action, authorize typing events against sender
+membership, rate-limit WebSocket sends, add leave/block/report controls and
+retention/delivery rules, and configure the production WebSocket proxy. Keep
+these follow-ups visible when planning a public release. This checkpoint does
+not mark Stage 9-2 or Stage 13 fully released, so release version files remain
+unchanged.
+
 ### What is running
 
 The local development stack runs from `/home/naveen/Desktop/fmlcore`:
@@ -86,14 +107,14 @@ Schema and config: `backend/app/models.py`, `backend/app/config.py`, `backend/mi
 
 ### Database and retry configuration
 
-The current local migration head is `20261107_0903`. It removes the one-attempt-per-day
+The current local migration head is `20261110_0912`. Revision `20261107_0903` removes the one-attempt-per-day
 constraint so a configurable cooldown can support repeat attempts. Local retry is one
 minute for testing (`SAME_SKY_RETRY_MINUTES=1`); production defaults to 1440 minutes.
 Eligibility currently requires 3 posts and 3 confessions and can be changed through
 `SAME_SKY_REQUIRED_POSTS` and `SAME_SKY_REQUIRED_CONFESSIONS`. An admin UI is future work.
 
-Stage 9-2 chat has not started. Do not begin it until the owner explicitly approves its
-scope; the stage rule below still applies.
+Stage 9-2 chat implementation is in progress; see the snapshot update above for
+the remaining safety and production checks.
 
 ### Admin console implementation
 
@@ -127,11 +148,12 @@ owner names the stage and gives an explicit "go". The flow each time:
 - [x] **7 — Dynamic themes + navigation polish.** Five site-wide palettes plus a system preference, saved per account, animated active routes, and accessible button feedback.
 - [x] **8 — The Confession Sky.** Up to 30 public confession balloons, click-to-pop selection, persisted view counts, private visibility, creation, reactions, and comments. No random-discovery, load-more, or safety-options controls appear in this view.
 - [x] **9-1 — Same Sky matching implementation.** Reuses normal FMLCore posts and Confession Sky balloons; each new story is automatically queued for the admin-selected analysis provider and a Gemini pgvector embedding; eligibility counts completed analyses; Start Matching searches saved data locally; mutual accept/decline; configurable no-match retry timer. No duplicate writing flow or chat. Live end-to-end provider verification is still pending; see the handoff above.
-- [ ] **9-2 — Matched-user chat.** Private conversations for mutually accepted Same Sky connections, with safety controls and no access to original private collection entries. *(planned; not started)*
+- [ ] **9-2 — Matched-user chat.** Private conversations for mutually accepted Same Sky connections, with safety controls and no access to original private collection entries. *(implementation present; safety and production verification pending)*
 - [ ] **10 — Real-time interactions.** WebSocket updates for core comments, reactions, and in-app notifications. *(planned; not started)*
 - [ ] **11 — Email notifications.** Send real emails for reactions and comments on a user's posts. *(planned; not started)*
 - **Voice rooms.** Folded into Stage 12; no separate standalone build.
 - [ ] **12 — Voice rooms + full voice meeting rooms.** Includes the social audio rooms and full meeting-room experience. *(future; deferred for now)*
+- [ ] **13 — Skin Studio.** Five user-selectable presentation skins—Calm Chaos, Social Classic, After Hours, Frappe, and Common Ground. Skins change layout, navigation treatment, typography, tokens, component presentation, and interaction styling while sharing the same features, APIs, permissions, and data. The default is Calm Chaos. Selection, preview, local caching, authenticated persistence, accessibility, responsive behavior, and no-refresh switching are required. See [SKIN_STUDIO.md](SKIN_STUDIO.md). *(implementation in progress; full acceptance verification pending)*
 
 ## Back-end (FastAPI — `backend/app`)
 
@@ -250,6 +272,32 @@ Room setup includes a name, description, topic/category, public/private visibili
 Technical and safety requirements: WebRTC audio with an SFU such as LiveKit or mediasoup (choose during Stage 12 planning); authenticated room access; microphone permissions; participant management; network-disconnect handling; host moderation; reporting and blocking; room closure and participant removal. Design for privacy and safety. Do not record audio by default.
 
 This entire stage is deferred for now; propose and approve its detailed product and technical scope when Stage 12 is scheduled.
+
+### Planned Stage 13 — Skin Studio
+
+Skin Studio gives each person a complete visual experience without branching the
+product into separate applications. The five skins are **Calm Chaos** (the default),
+**Social Classic**, **After Hours**, **Frappe**, and **Common Ground**.
+Each skin changes presentation—not product behavior—including the app shell,
+navigation, page layout, typography, spacing, surfaces, component variants, and
+motion treatment. Existing API contracts, authentication, content visibility,
+permissions, Same Sky, chat, notifications, and all underlying business logic
+remain shared.
+
+The implementation must introduce a centralized skin registry and CSS-variable
+token system; shared, skin-aware layouts and component variants; and the
+`/settings/appearance` Skin Studio page with temporary preview, Apply, and
+Cancel actions. A selected skin must update without a page reload, preserve
+unsent client state and WebSocket connections, persist for signed-in users in
+PostgreSQL, cache locally to avoid flash-of-default, and safely fall back to
+Calm Chaos when a stored value is invalid. Every skin must meet the existing
+responsive, keyboard, focus, contrast, semantic HTML, and reduced-motion bar.
+
+The current five-colour theme picker is an existing feature. Stage 13 must plan
+its migration into Skin Studio deliberately: preserve existing saved theme
+values until mapped or retired through a backward-compatible migration; do not
+silently overwrite a user preference. The implementation sequence and detailed
+acceptance checks are in [SKIN_STUDIO.md](SKIN_STUDIO.md).
 
 ### Delivery phases
 

@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { getUnreadCount } from "../../lib/api";
+import { getChatUnreadCount } from "../../lib/chatApi";
+import { useWebSocketEvent, WS_EVENTS } from "../../lib/websocket";
 import { THEMES, SYSTEM_THEME, themeByKey } from "../../lib/themes";
 import { useTheme } from "./ThemeProvider";
 
@@ -90,11 +92,49 @@ function ThemeSelector() {
             <p className="mt-4 text-xs font-semibold text-ink/70">
               {saving ? "Saving your palette…" : ready ? "Changes preview instantly and save automatically." : "Loading your palette…"}
             </p>
+            <Link href="/settings/appearance" onClick={() => setOpen(false)} className="mt-3 inline-block text-xs font-extrabold underline underline-offset-4">Open Skin Studio →</Link>
             {error ? <p className="mt-2 text-xs font-bold text-danger" role="alert">{error}</p> : null}
           </motion.section>
         ) : null}
       </AnimatePresence>
     </div>
+  );
+}
+
+function BellIcon({ className = "h-4 w-4" }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  );
+}
+
+function ChatIcon({ className = "h-4 w-4" }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
   );
 }
 
@@ -118,6 +158,36 @@ function UnreadBadge() {
   return count ? <span className="ml-1 inline-flex min-w-5 items-center justify-center border border-ink bg-coral px-1 text-[10px] font-extrabold text-on-brand">{count > 99 ? "99+" : count}</span> : null;
 }
 
+function ChatUnreadBadge() {
+  const [count, setCount] = useState(0);
+
+  const refresh = () => {
+    getChatUnreadCount().then((data) => setCount(data.count)).catch(() => setCount(0));
+  };
+
+  useEffect(() => {
+    refresh();
+    const refreshWhenVisible = () => { if (document.visibilityState === "visible") refresh(); };
+    window.addEventListener("fmlcore:chat-change", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("fmlcore:chat-change", refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
+
+  useWebSocketEvent(WS_EVENTS.CHAT_MESSAGE, () => refresh());
+  useWebSocketEvent(WS_EVENTS.CHAT_MESSAGE_READ, () => refresh());
+
+  return count ? (
+    <span className="ml-1 inline-flex min-w-5 items-center justify-center border border-ink bg-coral px-1 text-[10px] font-extrabold text-on-brand animate-pulse">
+      {count > 99 ? "99+" : count}
+    </span>
+  ) : null;
+}
+
 function ActiveIndicator({ reduce }) {
   return <motion.span layoutId="active-nav-indicator" className="absolute inset-x-1 bottom-0 h-1 bg-coral" transition={reduce ? { duration: 0 } : { type: "tween", duration: 0.55, ease: [0.22, 1, 0.36, 1] }} />;
 }
@@ -129,11 +199,11 @@ export default function SiteHeader({ user }) {
   const navClass = (active) => `relative border-2 border-ink px-2 py-2 shadow-[3px_3px_0_var(--color-shadow)] sm:px-3 ${active ? "bg-soft-purple text-ink" : "bg-white"}`;
 
   return (
-    <header className="sticky top-0 z-20 border-b-4 border-ink bg-paper/95">
+    <header className="site-navigation sticky top-0 z-20 border-b-4 border-ink bg-paper/95">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
         <Link href="/" aria-label="FMLCore home" aria-current={isActive("/") ? "page" : undefined} className={`relative flex items-center gap-2 ${isActive("/") ? "text-ink" : ""}`}>
           <img src="/image/logo.png" alt="" className="h-9 w-9 border-2 border-ink bg-lime object-contain p-1" />
-          <span className="hidden font-display text-xl font-extrabold tracking-tight sm:inline">FMLCore</span>
+          <span className="site-wordmark hidden font-display text-xl font-extrabold tracking-tight sm:inline">FMLCore</span>
           {isActive("/") ? <ActiveIndicator reduce={reduce} /> : null}
         </Link>
         <nav className="flex items-center gap-1 text-xs font-bold sm:gap-2 sm:text-sm" aria-label="Main navigation">
@@ -145,20 +215,40 @@ export default function SiteHeader({ user }) {
             <span className="sm:hidden" aria-hidden>◯</span><span className="hidden sm:inline">Confession</span>
             {isActive("/confessions") ? <ActiveIndicator reduce={reduce} /> : null}
           </Link>
+          <Link href="/leaderboard" aria-label="Leaderboard" aria-current={isActive("/leaderboard") ? "page" : undefined} className={navClass(isActive("/leaderboard"))}>
+            <span className="sm:hidden" aria-hidden>🏆</span><span className="hidden sm:inline">Leaderboard</span>
+            {isActive("/leaderboard") ? <ActiveIndicator reduce={reduce} /> : null}
+          </Link>
           {user ? <Link href="/same-sky" aria-label="Same Sky" aria-current={isActive("/same-sky") ? "page" : undefined} className={navClass(isActive("/same-sky"))}>
             <span className="sm:hidden" aria-hidden>☁</span><span className="hidden sm:inline">Same Sky</span>
             {isActive("/same-sky") ? <ActiveIndicator reduce={reduce} /> : null}
           </Link> : null}
-          <Link href="/leaderboard" aria-label="Leaderboard" aria-current={isActive("/leaderboard") ? "page" : undefined} className={`${navClass(isActive("/leaderboard"))} ${isActive("/leaderboard") ? "" : "bg-coral text-on-brand"}`}>
-            <span className="sm:hidden">Top</span><span className="hidden sm:inline">Leaderboard</span>
-            {isActive("/leaderboard") ? <ActiveIndicator reduce={reduce} /> : null}
-          </Link>
+          {user ? (
+            <Link
+              href="/chat"
+              aria-label="Chat"
+              aria-current={isActive("/chat") ? "page" : undefined}
+              className={`flex items-center ${navClass(isActive("/chat"))}`}
+            >
+              <ChatIcon className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+              <span className="common-ground-nav-label">Chat</span>
+              <ChatUnreadBadge />
+              {isActive("/chat") ? <ActiveIndicator reduce={reduce} /> : null}
+            </Link>
+          ) : null}
           {!user ? (
             <Link href="/me" aria-current={isActive("/me") ? "page" : undefined} className={navClass(isActive("/me"))}>About{isActive("/me") ? <ActiveIndicator reduce={reduce} /> : null}</Link>
           ) : null}
           {user ? (
-            <Link href="/notifications" aria-current={isActive("/notifications") ? "page" : undefined} aria-label="Notifications" className={navClass(isActive("/notifications"))}>
-              <span className="sm:hidden">Inbox</span><span className="hidden sm:inline">Notifications</span><UnreadBadge />
+            <Link
+              href="/notifications"
+              aria-current={isActive("/notifications") ? "page" : undefined}
+              aria-label="Notifications"
+              className={`flex items-center ${navClass(isActive("/notifications"))}`}
+            >
+              <BellIcon className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+              <span className="common-ground-nav-label">Updates</span>
+              <UnreadBadge />
               {isActive("/notifications") ? <ActiveIndicator reduce={reduce} /> : null}
             </Link>
           ) : (
@@ -168,6 +258,7 @@ export default function SiteHeader({ user }) {
             </>
           )}
           {user ? <Link href="/profile" aria-current={isActive("/profile") ? "page" : undefined} className={`${navClass(isActive("/profile"))} max-w-24 truncate sm:max-w-none`}>@{user.username}{isActive("/profile") ? <ActiveIndicator reduce={reduce} /> : null}</Link> : null}
+          {user ? <Link href="/settings/appearance" aria-label="Skin Studio" aria-current={isActive("/settings") ? "page" : undefined} className={`${navClass(isActive("/settings"))} hidden lg:block`}>Skin{isActive("/settings") ? <ActiveIndicator reduce={reduce} /> : null}</Link> : null}
           <ThemeSelector />
         </nav>
       </div>

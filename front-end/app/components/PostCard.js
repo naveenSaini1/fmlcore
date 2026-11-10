@@ -30,8 +30,12 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
   const shadow = preview ? "shadow-[6px_6px_0_var(--color-shadow)]" : "shadow-[8px_8px_0_var(--color-shadow)]";
 
   return (
-    <article className={`border-4 border-ink bg-white p-5 ${shadow} ${tilt}`}>
-      <div className="flex items-center justify-between gap-3">
+    <article
+      data-card-layout={index % 4}
+      data-preview={preview ? "true" : undefined}
+      className={`post-card post-card--${index % 4} border-4 border-ink bg-white p-5 ${shadow} ${tilt}`}
+    >
+      <div className="post-byline flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {post.is_anonymous ? (
             <span className="flex h-9 w-9 items-center justify-center border-2 border-ink bg-ink text-lg text-on-ink">
@@ -56,13 +60,13 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
       </div>
 
       <span
-        className="mt-4 inline-block -rotate-1 border-2 border-ink px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide text-on-brand"
+        className="post-category mt-4 inline-block -rotate-1 border-2 border-ink px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide text-on-brand"
         style={{ backgroundColor: accent }}
       >
         {post.category}
       </span>
 
-      <p className="mt-3 whitespace-pre-wrap break-words text-lg font-semibold leading-snug">
+      <p className="post-body mt-3 whitespace-pre-wrap break-words text-lg font-semibold leading-snug">
         {post.body}
       </p>
 
@@ -70,11 +74,11 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
         <img
           src={image}
           alt=""
-          className="mt-4 max-h-96 w-full border-4 border-ink object-cover"
+          className="post-image mt-4 max-h-96 w-full border-4 border-ink object-cover"
         />
       ) : null}
 
-      <div className="mt-4 inline-flex items-center gap-2 border-2 border-ink bg-paper px-2 py-1">
+      <div className="post-mood mt-4 inline-flex items-center gap-2 border-2 border-ink bg-paper px-2 py-1">
         <span className="text-lg leading-none" aria-hidden>
           {mood.emoji}
         </span>
@@ -82,7 +86,7 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
       </div>
 
       {!preview ? (
-        <div className="mt-4 border-t-2 border-dashed border-ink/40 pt-4">
+        <div className="post-interactions mt-4 border-t-2 border-dashed border-ink/40 pt-4">
           <ReactionBar post={post} onChange={setLivePost} />
           <button
             type="button"

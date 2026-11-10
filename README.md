@@ -17,8 +17,11 @@ stories. Its product rule is simple: **relatability over likes and followers**.
 - Same Sky matching from existing posts and Confession Sky balloons. Each new
   post/confession is analyzed once after saving; “Start Matching” later compares
   the stored results. Same Sky has mutual match
-  suggestions and a configurable retry timer after no match. It has no chat;
-  matched-user messaging is planned for Stage 9-2.
+  suggestions and a configurable retry timer after no match. Stage 9-2 chat
+  implementation is present but still needs safety and production verification;
+  see the current handoff before deploying it.
+- Skin Studio provides five complete presentation skins at
+  `/settings/appearance`, with preview and persistent account preferences.
 - Same Sky eligibility thresholds are configurable with `SAME_SKY_REQUIRED_POSTS`
   and `SAME_SKY_REQUIRED_CONFESSIONS` in backend settings.
 

@@ -57,7 +57,7 @@ export default function ReactionBar({ post, onChange }) {
   const used = REACTIONS.filter((r) => (post.reactions?.[r.key] || 0) > 0);
 
   return (
-    <div>
+    <div className="post-reactions">
       <div className="flex flex-wrap items-center gap-1.5">
         {PRIMARY_REACTIONS.map(button)}
         {promoted ? button(promoted) : null}

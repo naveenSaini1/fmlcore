@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Post, SameSkyAnalysis, SameSkyAttempt, SameSkyEmbedding, SameSkyMatch, SameSkyProfile, User, UserBlock
+from app.models import ChatConversation, Post, SameSkyAnalysis, SameSkyAttempt, SameSkyEmbedding, SameSkyMatch, SameSkyProfile, User, UserBlock
 from app.system_settings import REQUIRED_CONFESSIONS, REQUIRED_POSTS, same_sky_rules
 from app.schemas import (
     SameSkyAttemptOut,
@@ -106,7 +106,7 @@ def update_eligibility(
     return exp_total, conf_total, exp_ready, conf_ready, pending, int(enough)
 
 
-def _match_out(match: SameSkyMatch, user: User, other_user: User) -> SameSkyMatchOut:
+def _match_out(match: SameSkyMatch, user: User, other_user: User, conversation_id: uuid.UUID | None = None) -> SameSkyMatchOut:
     is_a = match.user_a_id == user.id
     return SameSkyMatchOut(
         id=match.id,
@@ -123,6 +123,7 @@ def _match_out(match: SameSkyMatch, user: User, other_user: User) -> SameSkyMatc
         safe_explanation=match.safe_explanation,
         you_accepted=match.accepted_by_a if is_a else match.accepted_by_b,
         they_accepted=match.accepted_by_b if is_a else match.accepted_by_a,
+        conversation_id=conversation_id,
         created_at=match.created_at,
     )
 
@@ -172,6 +173,15 @@ def profile_response(db: Session, user: User) -> SameSkyProfileOut:
     }
     person_ids -= blocked_ids
     people = {p.id: p for p in db.scalars(select(User).where(User.id.in_(person_ids))).all()} if person_ids else {}
+    connected_match_ids = [m.id for m in matches if m.status == "connected"]
+    conv_map = {}
+    if connected_match_ids:
+        conv_rows = db.execute(
+            select(ChatConversation.same_sky_match_id, ChatConversation.id)
+            .where(ChatConversation.same_sky_match_id.in_(connected_match_ids))
+        ).all()
+        conv_map = {row[0]: row[1] for row in conv_rows}
+
     result_matches = []
     for match in matches:
         other_id = match.user_b_id if match.user_a_id == user.id else match.user_a_id
@@ -179,7 +189,7 @@ def profile_response(db: Session, user: User) -> SameSkyProfileOut:
             continue
         other_user = people.get(other_id)
         if other_user is not None:
-            result_matches.append(_match_out(match, user, other_user))
+            result_matches.append(_match_out(match, user, other_user, conv_map.get(match.id)))
     result_declined_matches = []
     for match in declined_matches:
         other_id = match.user_b_id if match.user_a_id == user.id else match.user_a_id

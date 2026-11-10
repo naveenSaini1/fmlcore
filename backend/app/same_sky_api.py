@@ -356,8 +356,14 @@ def respond_to_match(
         match.accepted_by_a = True
     else:
         match.accepted_by_b = True
+
+    conversation_id = None
     if match.accepted_by_a and match.accepted_by_b:
         match.status = "connected"
+        from app.chat.service import get_or_create_same_sky_conversation
+        conv = get_or_create_same_sky_conversation(db, match.id, match.user_a_id, match.user_b_id)
+        conversation_id = conv.id
+
     if accept and not current_user_accepted:
         notification_service.publish(db, NotificationEvent(
             recipient_id=other_id,
@@ -367,7 +373,22 @@ def respond_to_match(
         ))
     match.updated_at = datetime.now(timezone.utc)
     db.commit()
-    return {"id": match.id, "status": match.status}
+
+    if conversation_id:
+        import asyncio
+        from app.websocket.manager import ws_manager
+        from app.websocket.events import SAME_SKY_CONNECTION_CREATED
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(ws_manager.send_to_users(
+                [match.user_a_id, match.user_b_id],
+                SAME_SKY_CONNECTION_CREATED,
+                {"match_id": str(match.id), "conversation_id": str(conversation_id)},
+            ))
+        except RuntimeError:
+            pass
+
+    return {"id": match.id, "status": match.status, "conversation_id": conversation_id}
 
 
 @router.post("/matches/{match_id}/reopen")
