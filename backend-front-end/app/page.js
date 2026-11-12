@@ -257,7 +257,7 @@ export default function AdminPage() {
 
       <section className="main-grid">
         <article className="card panel">
-          <div className="panel-head"><div><h2>People on FMLCore</h2><p className="panel-subtitle">Open an account to see activity and public stories.</p></div><form onSubmit={searchUsers}><input className="search-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search username or email" aria-label="Search users"/></form></div>
+          <div className="panel-head"><div><h2>People on FMLCore</h2><p className="panel-subtitle">Open an account to see activity and stories.</p></div><form onSubmit={searchUsers}><input className="search-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search username or email" aria-label="Search users"/></form></div>
           <div className="table-wrap">
             <table>
               <thead><tr><th>Account</th><th>Last sign-in</th><th>Posts</th><th>Confessions</th><th>Same Sky</th></tr></thead>
@@ -281,7 +281,7 @@ export default function AdminPage() {
             <div className="detail-item"><small>Reactions</small><strong>{selectedUser.reactions_count}</strong></div>
             <div className="detail-item"><small>Matching entries</small><strong>{selectedUser.same_sky_ready}/{selectedUser.same_sky_selected} ready</strong></div>
             <div className="detail-item"><small>Matching searches</small><strong>{selectedUser.same_sky_attempts}</strong></div>
-          </div><UserStories key={selectedUser.id} username={selectedUser.username} api={api} dateLabel={dateLabel} /></section>}
+          </div><UserStories key={selectedUser.id} userId={selectedUser.id} api={api} dateLabel={dateLabel} /></section>}
         </article>
 
         <aside className="card panel">
@@ -327,7 +327,7 @@ export default function AdminPage() {
             <button className="btn" type="submit" disabled={busy}>{busy ? "Saving…" : "Save settings"}</button>
           </form>}
           <div className="jobs"><span>AI jobs</span>{Object.entries(overview?.same_sky_jobs || {}).map(([status, count]) => <span key={status}>{status}: {count}</span>)}</div>
-          <p className="note">User activity is shown as timestamps and totals only. Public posts and confessions are available in the account detail view.</p>
+          <p className="note">User activity is shown as timestamps and totals only. Posts and confessions are available in the account detail view.</p>
         </aside>
       </section>
     </main>

@@ -2,14 +2,16 @@
 
 from datetime import datetime, timedelta, timezone
 import uuid
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import Literal
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session, aliased
 
-from app.config import settings
+from app.config import UPLOAD_DIR, settings
 from app.db import get_db
 from app.limiter import limit
 from app.models import (
@@ -230,6 +232,62 @@ def admin_user_detail(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found.")
     return admin_users_for_one(db, user)
+
+
+@router.get("/users/{user_id}/stories")
+def admin_user_stories(
+    user_id: uuid.UUID,
+    response: Response,
+    surface: Literal["feed", "confession"] = "feed",
+    cursor: str | None = None,
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(admin_user),
+) -> dict:
+    response.headers["Cache-Control"] = "private, no-store"
+    if db.get(User, user_id) is None:
+        raise HTTPException(404, "User not found.")
+
+    stmt = select(Post).where(Post.author_id == user_id, Post.surface == surface)
+    if cursor:
+        try:
+            stamp, _, key = cursor.partition("|")
+            before = datetime.fromisoformat(stamp)
+            before_id = uuid.UUID(key)
+            if before.tzinfo is None:
+                raise ValueError()
+        except ValueError:
+            raise HTTPException(400, "Bad cursor.") from None
+        stmt = stmt.where((Post.created_at < before) | ((Post.created_at == before) & (Post.id < before_id)))
+
+    rows = db.scalars(stmt.order_by(Post.created_at.desc(), Post.id.desc()).limit(limit + 1)).all()
+    page = rows[:limit]
+    return {
+        "posts": [{
+            "id": post.id,
+            "body": post.body,
+            "created_at": post.created_at,
+            "visibility": post.visibility,
+            "is_anonymous": post.is_anonymous,
+            "image_url": f"/admin/stories/{post.id}/image" if post.image_file else None,
+        } for post in page],
+        "next_cursor": f"{page[-1].created_at.isoformat()}|{page[-1].id}" if len(rows) > limit else None,
+    }
+
+
+@router.get("/stories/{post_id}/image")
+def admin_story_image(
+    post_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(admin_user),
+):
+    post = db.get(Post, post_id)
+    if not post or not post.image_file or Path(post.image_file).name != post.image_file:
+        raise HTTPException(404, "Image not found.")
+    image = UPLOAD_DIR / "posts" / post.image_file
+    if not image.is_file():
+        raise HTTPException(404, "Image not found.")
+    return FileResponse(image, headers={"Cache-Control": "private, no-store"})
 
 
 @router.get("/match-explorer")

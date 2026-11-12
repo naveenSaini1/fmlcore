@@ -49,9 +49,9 @@ entry flow. New Google accounts must create their profile on the public app firs
 - The account list shows email, join date, last sign-in, post/confession totals,
   and Same Sky readiness. Selecting an account shows comment/reaction totals and
   matching-attempt counts.
-- Selecting an account also shows its public posts and confessions, with dates,
-  images, and independent pagination. The lists reuse the public profile API
-  and exclude private and anonymous stories.
+- Selecting an account shows its posts and confessions, with dates, images,
+  visibility labels, and independent pagination. Admin-only routes include
+  private and anonymous stories and require the existing admin allowlist.
 - Login timestamps are recorded at successful login. Existing accounts are
   backfilled to their account-creation time because signup immediately creates a
   signed-in session.

@@ -8,6 +8,8 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from app.db import engine, get_db
+from app.config import settings
+from app.security import make_token
 from app.main import app, optional_user, public_profile, public_profile_posts, notification_to_public
 from app.chat.routes import chat_user
 from app.chat.service import get_conversation_detail, get_conversation_messages, get_user_conversations
@@ -67,6 +69,35 @@ class ProfileIdentityTests(unittest.TestCase):
         self.viewer=self.a
         self.assertEqual(self.client.get(f'/users/{self.b.username}').status_code,404)
         self.assertEqual(self.client.get(f'/users/{self.b.username}/posts').status_code,404)
+
+    def test_admin_story_lists_include_private_and_anonymous_with_access_control(self):
+        for surface in ("feed", "confession"):
+            self.db.add_all([
+                Post(author_id=self.b.id, body=f"{surface}:public", category="Life", mood="soft", surface=surface),
+                Post(author_id=self.b.id, body=f"{surface}:private", category="Life", mood="soft", surface=surface,
+                     visibility="private", is_anonymous=True, image_file="fixture.png"),
+            ])
+        self.db.flush()
+        path = f"/admin/users/{self.b.id}/stories"
+        with patch.object(settings, "admin_emails", self.a.email):
+            self.assertEqual(self.client.get(path).status_code, 401)
+            self.client.cookies.set("fml_session", make_token(self.outsider.id))
+            self.assertEqual(self.client.get(path).status_code, 403)
+            self.client.cookies.set("fml_session", make_token(self.a.id))
+            for surface in ("feed", "confession"):
+                first = self.client.get(path, params={"surface": surface, "limit": 1})
+                self.assertEqual(first.status_code, 200)
+                self.assertIn("no-store", first.headers["Cache-Control"])
+                data = first.json()
+                second = self.client.get(path, params={"surface": surface, "limit": 1, "cursor": data["next_cursor"]}).json()
+                rows = data["posts"] + second["posts"]
+                self.assertEqual({row["body"] for row in rows}, {f"{surface}:public", f"{surface}:private"})
+                private = next(row for row in rows if row["visibility"] == "private")
+                self.assertTrue(private["is_anonymous"])
+                self.assertTrue(private["image_url"].startswith("/admin/stories/"))
+                self.assertIsNone(second["next_cursor"])
+            self.client.cookies.clear()
+            self.assertEqual(self.client.get(private["image_url"]).status_code, 401)
 
     def test_nickname_one_sided_reveal_and_withdrawal(self):
         path=f'/chat/conversations/{self.conv.id}'

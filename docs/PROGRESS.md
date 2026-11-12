@@ -8,9 +8,9 @@ for the per-version log.
 
 ## Admin user stories — 12 November 2026
 
-The admin user detail view shows public posts and confessions in separate
-paginated lists. It reuses the public profile API, keeping private and
-anonymous stories out of the account view.
+The admin user detail view shows all posts and confessions in separate
+paginated lists with privacy labels. Story and image routes require admin
+access. Public profile visibility rules are unchanged.
 
 ## Native notification prompt and mobile navigation — 12 November 2026
 
