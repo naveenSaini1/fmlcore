@@ -92,8 +92,12 @@ else
  [[ -z $(git -C "$INSTALL_DIR/repository" status --porcelain) ]] || { echo 'Deployment repository has local edits; preserve or resolve them before retrying.'; exit 1; }
  git -C "$INSTALL_DIR/repository" remote set-url origin "$REPO_URL"
  git_auth -C "$INSTALL_DIR/repository" fetch origin "$BRANCH"
- git -C "$INSTALL_DIR/repository" checkout "$BRANCH"
- git -C "$INSTALL_DIR/repository" merge --ff-only FETCH_HEAD
+ if git -C "$INSTALL_DIR/repository" show-ref --verify --quiet "refs/heads/$BRANCH"; then
+  git -C "$INSTALL_DIR/repository" checkout "$BRANCH"
+  git -C "$INSTALL_DIR/repository" merge --ff-only FETCH_HEAD
+ else
+  git -C "$INSTALL_DIR/repository" checkout -b "$BRANCH" FETCH_HEAD
+ fi
 fi
 cleanup; ASKPASS=""; unset GITHUB_TOKEN GIT_ASKPASS
 COMMIT=$(git -C "$INSTALL_DIR/repository" rev-parse HEAD)

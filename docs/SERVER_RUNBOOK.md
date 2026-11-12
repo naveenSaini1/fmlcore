@@ -128,7 +128,8 @@ executed as shell code, so keep it writable only by a trusted operator.
 
 There is no automatic GitHub-to-server deployment. Review, commit, and push the
 intended branch, then set `BRANCH` in the server's private config to that branch.
-Use `DOMAIN=fmlcore.com`, `ADMIN_DOMAIN=admin.fmlcore.com`, and
+This release is published on `codex/home-space-profile-skins`. Use
+`DOMAIN=fmlcore.com`, `ADMIN_DOMAIN=admin.fmlcore.com`, and
 `STAGING_ONLY=false` for public production.
 
 ```bash
