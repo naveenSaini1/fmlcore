@@ -7,6 +7,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 - Use Chrome's native permission prompt on the first eligible
   interaction and removes the notification settings cards.
+- Show public posts and confessions when an admin opens a user’s details.
 - Swap the mobile positions of Leaderboard and Same Sky.
 - Skip the full-screen loader and page exit animation on phones.
 

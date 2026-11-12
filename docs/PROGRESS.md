@@ -6,6 +6,12 @@ This file is the pick-up point for anyone (human or AI) continuing the build. Re
 [fmlcore-vision.md](fmlcore-vision.md) for product intent and [../CHANGELOG.md](../CHANGELOG.md)
 for the per-version log.
 
+## Admin user stories — 12 November 2026
+
+The admin user detail view shows public posts and confessions in separate
+paginated lists. It reuses the public profile API, keeping private and
+anonymous stories out of the account view.
+
 ## Native notification prompt and mobile navigation — 12 November 2026
 
 Restored the previous mobile layout. Leaderboard is in the mobile bottom bar,
