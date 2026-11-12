@@ -109,11 +109,10 @@ export default function SiteHeader({ user }) {
     { href: "/", label: "Home", icon: "home" },
     { href: "/explore", label: "Explore", icon: "explore" },
     { href: "/confessions", label: "Confession", icon: "confession" },
+    { href: "/leaderboard", label: "Leaderboard", icon: "leaderboard" },
     ...(user ? [
-      { href: "/same-sky", label: "Same Sky", icon: "sky" },
       { href: "/chat", label: "Chat", icon: "chat" },
     ] : [
-      { href: "/leaderboard", label: "Leaderboard", icon: "leaderboard" },
       { href: "/me", label: "About", icon: "about" },
     ]),
   ];
@@ -181,7 +180,7 @@ export default function SiteHeader({ user }) {
         {!user && <GuestAppearance />}
         <div className="mobile-header-actions">
           {user ? <>
-            <Link href="/leaderboard" aria-label="Leaderboard" title="Leaderboard" aria-current={isActive("/leaderboard") ? "page" : undefined}><MobileIcon name="leaderboard" /></Link>
+            <Link href="/same-sky" aria-label="Same Sky" title="Same Sky" aria-current={isActive("/same-sky") ? "page" : undefined}><MobileIcon name="sky" /></Link>
             <Link href="/notifications" aria-label="Notifications" title="Notifications" aria-current={isActive("/notifications") ? "page" : undefined}><MobileIcon name="notifications" /><UnreadBadge count={notificationCount} /></Link>
           </> : <><Link href="/login">Log in</Link><Link href="/signup" className="mobile-guest-join">Join</Link></>}
         </div>

@@ -2,6 +2,7 @@
 .mobile-bottom-nav, .mobile-header-actions { display: none; }
 
 @media (max-width: 640px) {
+  .navigation-overlay { display: none; }
   html[data-skin] { --mobile-nav-height: calc(64px + env(safe-area-inset-bottom, 0px)); scroll-padding-bottom: calc(var(--mobile-nav-height) + 16px); }
   html[data-skin] .app-content { padding-bottom: var(--mobile-nav-height); }
   html[data-skin] header.site-navigation { position: sticky; top: 0; border-bottom: 1px solid var(--theme-border); background: var(--color-white); box-shadow: none; }

@@ -6,6 +6,15 @@ This file is the pick-up point for anyone (human or AI) continuing the build. Re
 [fmlcore-vision.md](fmlcore-vision.md) for product intent and [../CHANGELOG.md](../CHANGELOG.md)
 for the per-version log.
 
+## Native notification prompt and mobile navigation — 12 November 2026
+
+Restored the previous mobile layout. Leaderboard is in the mobile bottom bar,
+and Same Sky is in the signed-in mobile header. Phone navigation skips the
+full-screen loader and page exit animation. Browser notification
+permission is requested from the first eligible trusted click after sign-in.
+There is no app prompt or notification settings card. Local Web Push keys
+are stored in the ignored backend environment file for verification.
+
 ## Live leaderboard, profile appearance, and browser push — 12 November 2026
 
 The weekly leaderboard panel and full page refresh when committed reactions

@@ -2,11 +2,21 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+
+const phoneQuery = "(max-width: 640px)";
+const subscribeToPhone = (listener) => {
+  const query = window.matchMedia(phoneQuery);
+  query.addEventListener("change", listener);
+  return () => query.removeEventListener("change", listener);
+};
 
 export function PageMotion({ children }) {
   const pathname = usePathname();
   const reduce = useReducedMotion();
+  const phone = useSyncExternalStore(subscribeToPhone, () => window.matchMedia(phoneQuery).matches, () => false);
+
+  if (phone) return <div className="app-content min-h-screen">{children}</div>;
 
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -35,6 +45,7 @@ export function NavigationProgress() {
 
   useEffect(() => {
     const onClick = (event) => {
+      if (window.matchMedia(phoneQuery).matches) return;
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = event.target.closest?.("a[href]");
       if (!anchor || anchor.target === "_blank") return;

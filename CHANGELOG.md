@@ -5,6 +5,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased] — 2026-11-12
 
+- Use Chrome's native permission prompt on the first eligible
+  interaction and removes the notification settings cards.
+- Swap the mobile positions of Leaderboard and Same Sky.
+- Skip the full-screen loader and page exit animation on phones.
+
 - Refresh weekly leaderboard rankings automatically after committed votes and
   exclude private stories from public rankings.
 - Move signed-in skin and theme controls from Home to Edit Profile.

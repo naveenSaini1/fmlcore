@@ -1,7 +1,5 @@
 "use client";
 
-import BrowserNotifications from "../components/BrowserNotifications";
-
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "../../lib/api";
@@ -96,7 +94,6 @@ export default function NotificationsPage() {
             {pending ? "Saving…" : "Mark all read"}
           </button>
         </header>
-        <BrowserNotifications />
         {error ? <p className="mb-4 border-4 border-ink bg-coral p-3 font-bold text-on-brand" role="alert">{error}</p> : null}
         {status === "loading" ? <p className="font-note text-2xl">Checking in…</p> : null}
         {status === "ready" && items.length === 0 ? (

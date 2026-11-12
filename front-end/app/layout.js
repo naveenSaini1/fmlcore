@@ -1,6 +1,7 @@
 import localFont from "next/font/local";
 import { NavigationProgress, PageMotion } from "./components/PageMotion";
 import SiteHeaderShell from "./components/SiteHeaderShell";
+import BrowserNotifications from "./components/BrowserNotifications";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { SkinProvider } from "./components/SkinProvider";
 import { SessionProvider } from "../lib/session";
@@ -43,6 +44,7 @@ export default function RootLayout({ children }) {
             <ThemeProvider>
               <WebSocketProvider>
                 <SiteHeaderShell />
+                <BrowserNotifications />
                 <NavigationProgress />
                 <PageMotion>{children}</PageMotion>
               </WebSocketProvider>

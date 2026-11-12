@@ -7,7 +7,6 @@ import { motion, useReducedMotion } from "motion/react";
 import Field, { inputClass } from "./Field";
 import ReportedPosts from "./ReportedPosts";
 import SkinStudio from "./SkinStudio";
-import BrowserNotifications from "./BrowserNotifications";
 import { logout, mediaUrl, updateProfile, uploadAvatar } from "../../lib/api";
 import { useSession } from "../../lib/session";
 import { PROFILE_COLORS, PROFILE_STICKERS, profileColor, profileSticker } from "../../lib/profile-style";
@@ -197,7 +196,6 @@ export default function ProfileSettings({ embedded = false, initialUser = null, 
           </div>
         </form>
         <section className="md:col-span-2 border-4 border-ink bg-white p-5"><SkinStudio embedded /></section>
-        <div className="md:col-span-2"><BrowserNotifications /></div>
         <div className="md:col-span-2">
           <ReportedPosts />
         </div>

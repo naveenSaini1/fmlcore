@@ -182,8 +182,10 @@ its ranking through the usual visibility filters. Keep reverse proxy streaming
 enabled for this route. Reconnecting refreshes the ranking, and a visible tab
 uses a periodic refresh if the stream is unavailable.
 
-Signed-in users enable notifications in **Notifications** or **Edit Profile**.
-The browser prompts on that click. The service worker at `/sw.js` can display
+The website uses the native browser prompt on the first trusted click
+or tap after sign-in when push is configured and permission is undecided.
+A session flag prevents repeated requests. Users manage permission in their
+browser's site settings. The service worker at `/sw.js` can display
 alerts with the tab closed when the browser and operating system allow delivery.
 Alerts for votes, comments, matches, and messages use generic text and open the
 relevant inbox. The server checks blocks, mutes, and read state before delivery.
