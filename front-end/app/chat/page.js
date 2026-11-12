@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import ChatIdentityControls from "../components/ChatIdentityControls";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { getMe } from "../../lib/api";
+import { useSession } from "../../lib/session";
 import {
   getConversations,
   getConversation,
@@ -39,8 +40,8 @@ function ChatContent() {
   const initialConvId = searchParams.get("conversation");
   const reduce = useReducedMotion();
 
-  const { client, isConnected, currentUser } = useWebSocket();
-  const [user, setUser] = useState(currentUser);
+  const { client, isConnected } = useWebSocket();
+  const { user, ready: sessionReady } = useSession();
   const [conversations, setConversations] = useState([]);
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [selectedConvId, setSelectedConvId] = useState(initialConvId || null);
@@ -60,41 +61,60 @@ function ChatContent() {
   const messagesEndRef = useRef(null);
   const isTypingEmittedRef = useRef(false);
   const selectedConvIdRef = useRef(selectedConvId);
+  const conversationsRef = useRef(conversations);
+  const accountRef = useRef(user?.id);
+  const listRevision = useRef(0);
+  const routeSelection = useRef(null);
+  const mounted = useRef(false);
+  conversationsRef.current = conversations;
+  accountRef.current = user?.id;
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; listRevision.current += 1; };
+  }, [user?.id]);
 
   useEffect(() => {
     selectedConvIdRef.current = selectedConvId;
   }, [selectedConvId]);
 
-  // Load user
   useEffect(() => {
-    getMe()
-      .then(setUser)
-      .catch(() => {
-        router.push("/login");
-      });
-  }, [router]);
+    if (sessionReady && !user) router.push("/login");
+  }, [router, sessionReady, user]);
 
-  // Load conversation list
+  // All callers join the shared API request; only the latest page load applies.
   const refreshConversations = useCallback(async () => {
+    if (!accountRef.current) return [];
+    const account = accountRef.current;
+    const revision = ++listRevision.current;
     try {
       const data = await getConversations();
-      setConversations(data || []);
+      if (mounted.current && account === accountRef.current && revision === listRevision.current) setConversations(data || []);
       return data || [];
     } catch (err) {
-      console.warn("Failed to fetch conversations:", err);
+      if (err.name !== "AbortError") console.warn("Failed to fetch conversations:", err);
       return [];
     } finally {
-      setLoadingConvs(false);
+      if (mounted.current && account === accountRef.current && revision === listRevision.current) setLoadingConvs(false);
     }
   }, []);
 
   useEffect(() => {
-    refreshConversations().then((convs) => {
-      if (initialConvId && convs.some((c) => c.id === initialConvId)) {
-        setSelectedConvId(initialConvId);
-      }
-    });
-  }, [refreshConversations, initialConvId]);
+    if (!sessionReady || !user) return undefined;
+    setConversations([]);
+    setLoadingConvs(true);
+    refreshConversations();
+    window.addEventListener("fmlcore:chat-sync", refreshConversations);
+    return () => window.removeEventListener("fmlcore:chat-sync", refreshConversations);
+  }, [sessionReady, user?.id, refreshConversations]);
+
+  useEffect(() => {
+    const key = `${user?.id}:${initialConvId}`;
+    if (initialConvId && routeSelection.current !== key && conversations.some((conversation) => conversation.id === initialConvId)) {
+      routeSelection.current = key;
+      setSelectedConvId(initialConvId);
+    }
+  }, [initialConvId, conversations, user?.id]);
 
   // Load selected conversation & messages
   useEffect(() => {
@@ -122,7 +142,6 @@ function ChatContent() {
         // Mark read
         markConversationRead(selectedConvId)
           .then(() => {
-            window.dispatchEvent(new Event("fmlcore:chat-change"));
             setConversations((prev) =>
               prev.map((c) => (c.id === selectedConvId ? { ...c, unread_count: 0 } : c))
             );
@@ -138,7 +157,7 @@ function ChatContent() {
     return () => {
       isMounted = false;
     };
-  }, [selectedConvId]);
+  }, [selectedConvId, user?.id, isConnected]);
 
   // Auto-scroll to bottom on new message
   useEffect(() => {
@@ -164,23 +183,15 @@ function ChatContent() {
       });
 
       // Mark as read immediately since user is actively viewing
-      markConversationRead(conversation_id)
-        .then(() => {
-          window.dispatchEvent(new Event("fmlcore:chat-change"));
-          if (client) {
-            client.send(WS_EVENTS.CHAT_MESSAGE_READ, { conversation_id });
-          }
-        })
-        .catch(() => {});
+      markConversationRead(conversation_id).catch(() => {});
     }
 
-    // Update conversation item in list
+    // Fetching inside a state updater repeats side effects in development.
+    // Decide whether a refresh is needed before the pure state update.
+    if (!conversationsRef.current.some((conversation) => conversation.id === conversation_id)) refreshConversations();
     setConversations((prev) => {
       const idx = prev.findIndex((c) => c.id === conversation_id);
-      if (idx === -1) {
-        refreshConversations();
-        return prev;
-      }
+      if (idx === -1) return prev;
       const existing = prev[idx];
       const updated = {
         ...existing,
@@ -192,7 +203,6 @@ function ChatContent() {
       return [updated, ...rest];
     });
 
-    window.dispatchEvent(new Event("fmlcore:chat-change"));
   });
 
   useWebSocketEvent(WS_EVENTS.CHAT_MESSAGE_SENT, (data) => {
@@ -238,10 +248,6 @@ function ChatContent() {
       setOtherUserTyping(false);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     }
-  });
-
-  useWebSocketEvent(WS_EVENTS.SAME_SKY_CONNECTION_CREATED, () => {
-    refreshConversations();
   });
 
   // Real-time Presence Subscriptions (instant online/offline without refresh)
@@ -408,6 +414,15 @@ function ChatContent() {
     );
   });
 
+  useWebSocketEvent(WS_EVENTS.CHAT_IDENTITY_CHANGED, async (data) => {
+    refreshConversations();
+    const id = selectedConvIdRef.current;
+    if (data?.conversation_id !== id) return;
+    try {
+      const [detail, history] = await Promise.all([getConversation(id), getMessages(id, { limit: 50 })]);
+      if (selectedConvIdRef.current === id) { setSelectedConv(detail); setMessages(history.messages); setNextCursor(history.next_cursor); setHasMore(history.has_more); }
+    } catch (err) { console.warn("Could not refresh profile sharing:", err); }
+  });
   const otherUser = selectedConv?.other_user;
 
   return (
@@ -498,7 +513,7 @@ function ChatContent() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline justify-between gap-1">
                             <h2 className="truncate font-display text-sm font-extrabold">
-                              @{person.username}
+                              {person.username}
                             </h2>
                             <span className="shrink-0 text-[10px] font-bold text-ink/60">
                               {c.last_message ? timeAgo(c.last_message.created_at) : timeAgo(c.created_at)}
@@ -564,7 +579,7 @@ function ChatContent() {
 
                   <div>
                     <h2 className="font-display text-base font-extrabold leading-tight">
-                      @{otherUser.username}
+                      {otherUser.username}
                     </h2>
                     <p className="text-[11px] font-bold text-ink/70">
                       {otherUser.is_online ? "● Online" : "Offline"}
@@ -574,14 +589,16 @@ function ChatContent() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Link
-                    href={`/profile?u=${otherUser.username}`}
+                  {otherUser.is_revealed && otherUser.profile_username ? <Link
+                    href={`/users/${encodeURIComponent(otherUser.profile_username)}`}
                     className="border-2 border-ink bg-paper px-2.5 py-1 text-xs font-extrabold shadow-[2px_2px_0_var(--color-shadow)] hover:bg-soft-purple"
                   >
                     VIEW PROFILE
-                  </Link>
+                  </Link> : <span className="text-xs font-bold">Anonymous match</span>}
                 </div>
               </div>
+
+              <ChatIdentityControls key={selectedConv.id} conversation={selectedConv} onChange={(detail) => { if (selectedConvIdRef.current === detail.id) setSelectedConv(detail); refreshConversations(); }} />
 
               {/* Messages Area - strictly scrollable within fixed height */}
               <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
@@ -655,7 +672,7 @@ function ChatContent() {
                     exit={{ opacity: 0 }}
                     className="flex items-center gap-2 border-2 border-ink bg-white px-3 py-1.5 text-xs font-extrabold shadow-[2px_2px_0_var(--color-shadow)] max-w-xs"
                   >
-                    <span className="animate-pulse">@{otherUser.username} is typing</span>
+                    <span className="animate-pulse">{otherUser.username} is typing</span>
                     <span className="flex gap-0.5">
                       <span className="h-1.5 w-1.5 rounded-full bg-ink animate-bounce" />
                       <span className="h-1.5 w-1.5 rounded-full bg-ink animate-bounce [animation-delay:0.15s]" />

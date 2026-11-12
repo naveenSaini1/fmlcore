@@ -463,7 +463,7 @@ def run_worker() -> None:
         pass
     while True:
         try:
-            with psycopg.connect(raw_url, autocommit=True) as conn:
+            with psycopg.connect(raw_url, autocommit=True, application_name="fmlcore-same-sky-worker") as conn:
                 conn.execute("LISTEN same_sky_jobs;")
                 logger.info("Worker listening for Same Sky job events on channel 'same_sky_jobs'.")
                 while True:

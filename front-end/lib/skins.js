@@ -8,7 +8,7 @@ export const SKINS = [
     layout: "frappe", preview: ["#f8f8f8", "#ffffff", "#171717", "#e8f0fe"],
   },
   {
-    id: "calm", name: "Calm Chaos", tagline: "Clean, comfortable, and quietly expressive.",
+    id: "calm", name: "Calm Chaos", tagline: "The original. Bold borders, paper texture, and playful cards.",
     layout: "calm", preview: ["#f7f6f2", "#ffffff", "#c5ff41", "#ff5c4d"],
   },
   {

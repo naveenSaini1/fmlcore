@@ -14,7 +14,9 @@ AUTH_SUCCESS = "auth.success"
 AUTH_ERROR = "auth.error"
 
 # Chat Events
+CHAT_IDENTITY_CHANGED = "chat.identity.changed"
 CHAT_MESSAGE = "chat.message"
+CHAT_UNREAD_COUNT = "chat.unread_count"
 CHAT_MESSAGE_SEND = "chat.message.send"
 CHAT_MESSAGE_SENT = "chat.message.sent"
 CHAT_MESSAGE_DELIVERED = "chat.message.delivered"
@@ -30,6 +32,7 @@ PRESENCE_STATUS = "presence.status"
 
 # Notification & Same Sky Events
 NOTIFICATION_NEW = "notification.new"
+NOTIFICATION_CHANGED = "notification.changed"
 SAME_SKY_MATCH_ACCEPTED = "same_sky.match.accepted"
 SAME_SKY_CONNECTION_CREATED = "same_sky.connection.created"
 

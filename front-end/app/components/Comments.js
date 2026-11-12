@@ -1,14 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { addComment, deleteComment, getComments, mediaUrl } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
 import { profileColor, profileSticker } from "../../lib/profile-style";
 
 function Identity({ comment }) {
+  const IdentityTag = !comment.is_anonymous && comment.author?.username ? Link : "div";
   const avatar = comment.author ? mediaUrl(comment.author.avatar_url) : null;
   return (
-    <div className="flex items-center gap-2">
+    <IdentityTag {...(IdentityTag === Link ? { href: `/users/${encodeURIComponent(comment.author.username)}` } : {})} className="flex items-center gap-2">
       {comment.is_anonymous ? (
         <span className="flex h-6 w-6 items-center justify-center border-2 border-ink bg-ink text-xs text-on-ink">?</span>
       ) : avatar ? (
@@ -26,7 +28,7 @@ function Identity({ comment }) {
         </span>
       )}
       <span className="font-note text-base leading-none text-ink/60">{timeAgo(comment.created_at)}</span>
-    </div>
+    </IdentityTag>
   );
 }
 

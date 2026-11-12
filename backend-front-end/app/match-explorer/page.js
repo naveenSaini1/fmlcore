@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { readApiResponse } from "../lib/api-response.mjs";
 import { useRouter } from "next/navigation";
 
 async function api(path, options = {}) {
@@ -10,48 +11,59 @@ async function api(path, options = {}) {
     credentials: "include",
     headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...(options.headers || {}) },
   });
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!response.ok) throw new Error(data?.detail || "Something went wrong. Try again.");
-  return data;
+  return readApiResponse(response);
 }
 
 function percent(value) {
   return `${Math.round((value || 0) * 100)}%`;
 }
 
-function MatchGraph({ target, candidates, onSelect }) {
-  const visible = candidates.slice(0, 8);
-  if (!visible.length) {
-    return <div className="graph-empty">No candidates passed the live match thresholds for this preview.</div>;
+function MatchGraph({ target, candidates, onSelect, selectedUsername }) {
+  if (!candidates.length) {
+    return <div className="graph-empty">No accounts have cleared stories with current embeddings to compare yet.</div>;
   }
 
-  const center = { x: 360, y: 225 };
-  const nodes = visible.map((candidate, index) => {
-    const angle = -Math.PI / 2 + (2 * Math.PI * index) / visible.length;
-    return {
-      ...candidate,
-      x: center.x + Math.cos(angle) * 245,
-      y: center.y + Math.sin(angle) * 145,
-    };
+  // Add rings as the result set grows, keeping nodes at a readable fixed size.
+  const rings = [];
+  let remaining = candidates.length;
+  for (let ring = 0; remaining > 0; ring += 1) {
+    const radius = 180 + ring * 130;
+    const count = Math.min(remaining, Math.floor((2 * Math.PI * radius) / 120));
+    rings.push({ radius, count });
+    remaining -= count;
+  }
+  const size = 2 * (rings[rings.length - 1].radius + 65);
+  const center = { x: size / 2, y: size / 2 };
+  let offset = 0;
+  const nodes = rings.flatMap(({ radius, count }) => {
+    const entries = candidates.slice(offset, offset + count).map((candidate, index) => {
+      const angle = -Math.PI / 2 + (2 * Math.PI * index) / count;
+      return { ...candidate, x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius };
+    });
+    offset += count;
+    return entries;
   });
 
   return (
-    <svg className="match-graph" viewBox="0 0 720 450" role="img" aria-label={`Possible Same Sky connections for ${target.username}`}>
-      <defs><pattern id="graphDots" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="currentColor" opacity=".12" /></pattern></defs>
-      <rect width="720" height="450" fill="url(#graphDots)" />
-      {nodes.map((node) => <line key={`edge-${node.username}`} x1={center.x} y1={center.y} x2={node.x} y2={node.y} stroke={node.score >= 0.72 ? "#ff5c4d" : "#a875ff"} strokeWidth={2 + node.score * 5} opacity=".65" />)}
-      <circle cx={center.x} cy={center.y} r="61" fill="#c5ff41" stroke="#171717" strokeWidth="3" />
-      <text x={center.x} y={center.y - 7} textAnchor="middle" className="graph-center-label">@{target.username}</text>
-      <text x={center.x} y={center.y + 17} textAnchor="middle" className="graph-center-sub">YOU SEARCHED</text>
-      {nodes.map((node) => (
-        <g key={node.username} className="graph-node" role="button" tabIndex="0" aria-label={`Inspect @${node.username}, score ${percent(node.score)}`} onClick={() => onSelect(node)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelect(node); }}>
-          <circle cx={node.x} cy={node.y} r="43" fill={node.score >= 0.72 ? "#ffded9" : "#e7ddff"} stroke="#171717" strokeWidth="3" />
-          <text x={node.x} y={node.y - 2} textAnchor="middle" className="graph-score">{percent(node.score)}</text>
-          <text x={node.x} y={node.y + 17} textAnchor="middle" className="graph-node-label">@{node.username.slice(0, 13)}</text>
-        </g>
-      ))}
-    </svg>
+    <div className="match-graph-scroll" role="region" aria-label="All scored candidates chart. Scroll to explore." tabIndex="0">
+      <svg className="match-graph" width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="group" aria-label={`All ${candidates.length} scored Same Sky connections for ${target.username}`}>
+        <defs><pattern id="graphDots" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="currentColor" opacity=".12" /></pattern></defs>
+        <rect width={size} height={size} fill="url(#graphDots)" />
+        {nodes.map((node) => <line key={`edge-${node.username}`} x1={center.x} y1={center.y} x2={node.x} y2={node.y} stroke={node.passed_threshold ? "#ff5c4d" : "#a875ff"} strokeWidth={2 + node.score * 5} strokeDasharray={node.passed_threshold ? undefined : "6 5"} opacity=".65" />)}
+        <circle cx={center.x} cy={center.y} r="61" fill="#c5ff41" stroke="#171717" strokeWidth="3" />
+        <text x={center.x} y={center.y - 7} textAnchor="middle" className="graph-center-label">@{target.username}</text>
+        <text x={center.x} y={center.y + 17} textAnchor="middle" className="graph-center-sub">YOU SEARCHED</text>
+        {nodes.map((node) => (
+          <g key={node.username} className={`graph-node ${selectedUsername === node.username ? "selected" : ""}`} role="button" tabIndex="0" aria-pressed={selectedUsername === node.username} aria-label={`Inspect @${node.username}, score ${percent(node.score)}, ${node.passed_threshold ? "passes thresholds" : "below threshold"}`} onClick={() => onSelect(node)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(node); } }}>
+            <title>{`@${node.username} · ${percent(node.score)} · ${node.passed_threshold ? "Passes thresholds" : node.reason}`}</title>
+            <circle cx={node.x} cy={node.y} r="48" fill={node.passed_threshold ? "#ffded9" : "#e7ddff"} stroke="#171717" strokeWidth="3" />
+            <text x={node.x} y={node.y - 9} textAnchor="middle" className="graph-score">{percent(node.score)}</text>
+            <text x={node.x} y={node.y + 8} textAnchor="middle" className="graph-node-label">@{node.username.slice(0, 13)}</text>
+            <text x={node.x} y={node.y + 24} textAnchor="middle" className="graph-node-label">{node.passed_threshold ? "PASSES" : "BELOW"}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
   );
 }
 
@@ -132,10 +144,12 @@ export default function MatchExplorerPage() {
     router.push("/");
   }
 
-  const selected = useMemo(
-    () => selectedCandidate || result?.candidates?.[0] || null,
-    [selectedCandidate, result],
-  );
+  const scoredCandidates = useMemo(() => result ? [
+    ...result.candidates.map((candidate) => ({ ...candidate, passed_threshold: true })),
+    ...result.below_threshold.map((candidate) => ({ ...candidate, passed_threshold: false })),
+  ].sort((a, b) => b.score - a.score) : [], [result]);
+
+  const selected = selectedCandidate || scoredCandidates[0] || null;
 
   if (checking) return <main className="center">Checking admin access…</main>;
   if (!admin) {
@@ -151,14 +165,14 @@ export default function MatchExplorerPage() {
       </header>
 
       <section className="explorer-hero">
-        <div><p className="eyebrow">same sky · read-only diagnostics</p><h1>Match Explorer</h1><p className="intro">Search an account to see analysis health and how saved stories line up with eligible people.</p></div>
+        <div><p className="eyebrow">same sky · read-only diagnostics</p><h1>Match Explorer</h1><p className="intro">Search an account to see analysis health and how saved stories line up with other analyzed accounts.</p></div>
         <div className="hero-stamp"><span>NO AI CALLS</span><span>NO MATCHES CREATED</span></div>
       </section>
 
       <form className="card explorer-search" onSubmit={search}>
         <label htmlFor="match-username">Search a username</label>
         <div className="search-row"><input id="match-username" className="search-input" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="e.g. naveensaini" autoComplete="off" required/><button className="btn" disabled={busy}>{busy ? "Scanning saved data…" : "Explore matches"}</button></div>
-        <p className="field-help">Uses completed analyses, embeddings, readiness, blocks and the live scoring thresholds. Story text stays hidden.</p>
+        <p className="field-help">Compares cleared stories with current embeddings for all accounts, including scores below the live thresholds. Readiness and relationship status are shown separately. Story text stays hidden.</p>
       </form>
 
       {error && <p className="error" role="alert">{error}</p>}
@@ -184,24 +198,24 @@ export default function MatchExplorerPage() {
         {!result.preview_is_matchable && <p className="preview-warning" role="status">This account can’t start a live search yet. Similarities below are a diagnostic preview using the stories that are already ready.</p>}
 
         <section className="card graph-panel">
-          <div className="panel-head"><div><p className="eyebrow">saved-data preview</p><h2>Preview candidates</h2><p className="panel-subtitle">{result.candidate_stories_evaluated} story pairs evaluated with the live candidate filters and score rules.</p></div><span className="pill">{result.candidates.length} passed thresholds</span></div>
-          <MatchGraph target={result.target} candidates={result.candidates} onSelect={setSelectedCandidate}/>
-          <p className="graph-legend"><span className="legend-line"/> Stronger line = higher match score. Select a node to inspect its score.</p>
+          <div className="panel-head"><div><p className="eyebrow">saved-data preview</p><h2>Preview candidates</h2><p className="panel-subtitle">{result.candidate_stories_evaluated} story pairs evaluated. Showing all {scoredCandidates.length} scored accounts using the live score rules.</p></div><span className="pill">{result.candidates.length} passed thresholds</span></div>
+          <MatchGraph target={result.target} candidates={scoredCandidates} onSelect={setSelectedCandidate} selectedUsername={selected?.username}/>
+          <p className="graph-legend"><span className="legend-line"/> Solid coral = passes thresholds · dashed purple = below threshold. Thicker lines = higher scores. Scroll to explore; select a node to inspect.</p>
         </section>
 
         <section className="explorer-results-grid">
           <article className="card panel">
             <div className="panel-head"><div><p className="eyebrow">ranked by live score</p><h2>Candidate breakdown</h2></div></div>
-            {result.candidates.length ? <div className="candidate-list">{result.candidates.map((candidate, index) => <button type="button" key={candidate.username} className={`candidate-row ${selected?.username === candidate.username ? "selected" : ""}`} onClick={() => setSelectedCandidate(candidate)}><span className="candidate-rank">{String(index + 1).padStart(2, "0")}</span><span className="candidate-name"><span style={{ display: "flex", alignItems: "center", gap: 8 }}><strong>@{candidate.username}</strong>{candidate.relationship_status && <span className={`pill ${candidate.relationship_status === "Available" ? "" : "pill-off"}`} style={{ fontSize: "0.7rem", padding: "2px 8px" }}>{candidate.relationship_status}</span>}</span><small>{candidate.story_comparisons} story pairs · {candidate.shared_themes.join(", ")}</small></span><span className="candidate-score">{percent(candidate.score)}</span></button>)}</div> : <p className="muted">No candidate cleared all matching thresholds.</p>}
+            {scoredCandidates.length ? <div className="candidate-list">{scoredCandidates.map((candidate, index) => <button type="button" key={candidate.username} className={`candidate-row ${selected?.username === candidate.username ? "selected" : ""}`} onClick={() => setSelectedCandidate(candidate)}><span className="candidate-rank">{String(index + 1).padStart(2, "0")}</span><span className="candidate-name"><span style={{ display: "flex", alignItems: "center", gap: 8 }}><strong>@{candidate.username}</strong>{candidate.relationship_status && <span className={`pill ${candidate.relationship_status === "Available" ? "" : "pill-off"}`} style={{ fontSize: "0.7rem", padding: "2px 8px" }}>{candidate.relationship_status}</span>}</span><small>{candidate.passed_threshold ? "Passes thresholds" : "Below threshold"} · {candidate.story_comparisons} story pairs · {candidate.shared_themes.join(", ") || "No shared themes"}</small></span><span className="candidate-score">{percent(candidate.score)}</span></button>)}</div> : <p className="muted">No scored candidates available yet.</p>}
           </article>
           <article className="card panel score-panel">
             <p className="eyebrow">why this candidate</p>
-            {selected ? <><h2>@{selected.username} {selected.relationship_status && <span className="pill" style={{ fontSize: "0.75rem", verticalAlign: "middle", marginLeft: 8 }}>{selected.relationship_status}</span>}</h2><p className="shared-labels">{selected.shared_themes.join(" · ")}</p><ScoreBar label="Story similarity" value={selected.semantic_similarity}/><ScoreBar label="Theme + category fit" value={selected.context_score}/><ScoreBar label="Consistency across stories" value={selected.consistency_score}/><ScoreBar label="Preferences" value={selected.preference_fit}/><p className="score-formula">Final score weights: similarity 40% · context 25% · consistency 20% · preferences 15%.</p></> : <p className="muted">Select a candidate to inspect score components.</p>}
+            {selected ? <><h2>@{selected.username} {selected.relationship_status && <span className="pill" style={{ fontSize: "0.75rem", verticalAlign: "middle", marginLeft: 8 }}>{selected.relationship_status}</span>}</h2><p className={`threshold-status ${selected.passed_threshold ? "passed" : "below"}`}>{selected.passed_threshold ? "Passes scoring thresholds" : selected.reason}</p><p className="shared-labels">{selected.shared_themes.join(" · ") || "No shared themes"}</p><ScoreBar label="Story similarity" value={selected.semantic_similarity}/><ScoreBar label="Theme + category fit" value={selected.context_score}/><ScoreBar label="Consistency across stories" value={selected.consistency_score}/><ScoreBar label="Preferences" value={selected.preference_fit}/><p className="score-formula">Final score weights: similarity 40% · context 25% · consistency 20% · preferences 15%.</p></> : <p className="muted">Select a candidate to inspect score components.</p>}
           </article>
         </section>
 
-        {(result.below_threshold.length > 0 || result.excluded_accounts.length > 0) && <section className="card panel exclusion-panel"><p className="eyebrow">why others did not appear</p><h2>Filtered accounts</h2><div className="filter-list">
-          {result.below_threshold.map((candidate) => <div className="filter-row" key={`score-${candidate.username}`}><strong>@{candidate.username}</strong><span>{candidate.reason}</span><small>similarity {percent(candidate.semantic_similarity)} · shared themes: {candidate.shared_themes.join(", ") || "none"}</small></div>)}
+        {result.excluded_accounts.length > 0 && <section className="card panel exclusion-panel"><p className="eyebrow">accounts without comparable cleared stories</p><h2>Filtered accounts</h2><div className="filter-list">
+
           {result.excluded_accounts.map((candidate) => <div className="filter-row" key={`excluded-${candidate.username}`}><strong>@{candidate.username}</strong><span>{candidate.reason}</span><small>nearest-story similarity {percent(candidate.similarity)}</small></div>)}
         </div></section>}
 

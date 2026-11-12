@@ -55,3 +55,12 @@ unrelated formatting churn.
   and secure cookies.
 - Keep backend taxonomy and `front-end/lib/taxonomy.js` synchronized.
 - Do not represent unimplemented roadmap items as shipped functionality.
+
+## Keep the handoff and deployment docs current
+
+For each behavior or server change, update the affected feature guide,
+`docs/PROGRESS.md`, and `CHANGELOG.md` in the same work. Update
+`docs/SERVER_RUNBOOK.md` when paths, domains, storage, secrets handling, release
+commands, backups or recovery steps change. Record verification results and
+remaining limitations; distinguish live server changes from unshipped work.
+Never include private config values or credentials in these documents.

@@ -20,6 +20,8 @@ export class WebSocketClient {
     this.reconnectTimer = null;
     this.pingTimer = null;
     this.explicitDisconnect = false;
+    this.connectionVersion = 0;
+    this.connecting = false;
   }
 
   _resolveUrl() {
@@ -30,7 +32,7 @@ export class WebSocketClient {
     const host = window.location.hostname || "localhost";
     const port = process.env.NEXT_PUBLIC_BACKEND_PORT || "8000";
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${host}:${port}/ws`;
+    return process.env.NODE_ENV === "production" ? `${protocol}//${window.location.host}/ws` : `${protocol}//${host}:${port}/ws`;
   }
 
   _setStatus(newStatus) {
@@ -56,11 +58,14 @@ export class WebSocketClient {
 
   async connect() {
     if (typeof window === "undefined") return;
+    if (this.connecting) return;
     if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
     this.explicitDisconnect = false;
+    this.connecting = true;
+    const version = ++this.connectionVersion;
     this._setStatus(this.reconnectAttempts > 0 ? "reconnecting" : "connecting");
 
     let ticket = null;
@@ -72,6 +77,8 @@ export class WebSocketClient {
       }
     }
 
+    if (version !== this.connectionVersion) return;
+    this.connecting = false;
     const baseUrl = this._resolveUrl();
     const wsUrl = ticket ? `${baseUrl}?ticket=${encodeURIComponent(ticket)}` : baseUrl;
 
@@ -83,7 +90,9 @@ export class WebSocketClient {
       return;
     }
 
+    const socket = this.socket;
     this.socket.onopen = () => {
+      if (this.socket !== socket) return;
       this.reconnectAttempts = 0;
       this._setStatus("connected");
       this._startPing();
@@ -95,6 +104,7 @@ export class WebSocketClient {
     };
 
     this.socket.onmessage = (event) => {
+      if (this.socket !== socket) return;
       try {
         const payload = JSON.parse(event.data);
         const eventName = payload.event;
@@ -132,6 +142,7 @@ export class WebSocketClient {
     };
 
     this.socket.onclose = (event) => {
+      if (this.socket !== socket) return;
       this._stopPing();
       this.socket = null;
       if (this.explicitDisconnect) {
@@ -152,7 +163,9 @@ export class WebSocketClient {
 
   disconnect() {
     this.explicitDisconnect = true;
-    this.shouldReconnect = false;
+    this.connectionVersion += 1;
+    this.connecting = false;
+    this.reconnectAttempts = 0;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { mediaUrl } from "../../lib/api";
 import { categoryAccent, moodByKey } from "../../lib/taxonomy";
@@ -22,6 +23,7 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
     return <p className="border-2 border-dashed border-ink bg-paper p-3 text-sm font-bold">You muted or blocked this account. Its stories are hidden.</p>;
   }
 
+  const AuthorTag = !preview && !post.is_anonymous && post.author?.username ? Link : "div";
   const mood = moodByKey(post.mood);
   const accent = categoryAccent(post.category);
   const avatar = post.author ? mediaUrl(post.author.avatar_url) : null;
@@ -36,7 +38,7 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
       className={`post-card post-card--${index % 4} border-4 border-ink bg-white p-5 ${shadow} ${tilt}`}
     >
       <div className="post-byline flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <AuthorTag {...(AuthorTag === Link ? { href: `/users/${encodeURIComponent(post.author.username)}`, "aria-label": `View @${post.author.username} profile` } : {})} className="post-author flex items-center gap-2">
           {post.is_anonymous ? (
             <span className="flex h-9 w-9 items-center justify-center border-2 border-ink bg-ink text-lg text-on-ink">
               ?
@@ -51,20 +53,14 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
           {post.is_anonymous ? (
             <span className="font-display text-sm font-extrabold">Anonymous</span>
           ) : (
-            <span className="inline-flex items-center gap-1 border border-ink px-1.5 py-0.5 font-display text-sm font-extrabold text-on-brand" style={{ backgroundColor: profileColor(post.author?.profile_color) }}>
-              @{post.author?.username ?? "someone"} <span aria-hidden>{profileSticker(post.author?.profile_sticker)}</span>
+            <span className="post-author-name inline-flex items-center gap-1 border border-ink px-1.5 py-0.5 font-display text-sm font-extrabold text-on-brand" style={{ backgroundColor: profileColor(post.author?.profile_color) }}>
+              <span className="post-handle">@{post.author?.username ?? "someone"}</span> <span aria-hidden>{profileSticker(post.author?.profile_sticker)}</span>
             </span>
           )}
-        </div>
-        <div className="flex items-center gap-3"><span className="font-note text-xl leading-none text-ink/70">{timeAgo(post.created_at)}</span>{!preview && (onDelete || (viewerId && (!post.author || post.author.id !== viewerId))) ? <details className="post-actions"><summary aria-label="Post actions" title="Post actions">•••</summary><div className="post-actions-menu">{onDelete ? <button type="button" disabled={deleting} onClick={onDelete} className="block w-full border-2 border-ink bg-coral px-2 py-1 text-left text-xs font-extrabold">{deleting ? "Deleting…" : "Delete post"}</button> : <><ReportAction targetType="post" targetId={post.id} />{post.author ? <UserSafetyActions target={post.author} onHide={() => setHiddenBySafety(true)} /> : null}</>}</div></details> : null}</div>
+        </AuthorTag>
+        <span className="post-time font-note text-xl leading-none text-ink/70">{timeAgo(post.created_at)}</span>
+        <div className="post-card-menu">{!preview && (onDelete || (viewerId && (!post.author || post.author.id !== viewerId))) ? <details className="post-actions"><summary aria-label="Post actions" title="Post actions">•••</summary><div className="post-actions-menu">{onDelete ? <button type="button" disabled={deleting} onClick={onDelete} className="block w-full border-2 border-ink bg-coral px-2 py-1 text-left text-xs font-extrabold">{deleting ? "Deleting…" : "Delete post"}</button> : <><ReportAction targetType="post" targetId={post.id} />{post.author ? <UserSafetyActions target={post.author} onHide={() => setHiddenBySafety(true)} /> : null}</>}</div></details> : null}</div>
       </div>
-
-      <span
-        className="post-category mt-4 inline-block -rotate-1 border-2 border-ink px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide text-on-brand"
-        style={{ backgroundColor: accent }}
-      >
-        {post.category}
-      </span>
 
       <p className="post-body mt-3 whitespace-pre-wrap break-words text-lg font-semibold leading-snug">
         {post.body}
@@ -78,11 +74,17 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
         />
       ) : null}
 
-      <div className="post-mood mt-4 inline-flex items-center gap-2 border-2 border-ink bg-paper px-2 py-1">
-        <span className="text-lg leading-none" aria-hidden>
-          {mood.emoji}
+      <div className="post-context">
+        <span
+          className="post-category inline-block -rotate-1 border-2 border-ink px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide text-on-brand"
+          style={{ backgroundColor: accent }}
+        >
+          {post.category}
         </span>
-        <span className="text-xs font-extrabold lowercase">{mood.label}</span>
+        <div className="post-mood inline-flex items-center gap-2 border-2 border-ink bg-paper px-2 py-1">
+          <span className="text-lg leading-none" aria-hidden>{mood.emoji}</span>
+          <span className="text-xs font-extrabold lowercase">{mood.label}</span>
+        </div>
       </div>
 
       {!preview ? (
@@ -91,7 +93,7 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
           <button
             type="button"
             onClick={() => setShowComments((v) => !v)}
-            className="mt-3 text-sm font-extrabold underline"
+            className="post-comments-toggle mt-3 text-sm font-extrabold underline"
           >
             {showComments ? "hide comments" : `comments (${post.comment_count})`}
           </button>

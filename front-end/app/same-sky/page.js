@@ -1,19 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
-  getMe,
   getSameSky,
   getSameSkyAttempt,
-  reportContent,
   reopenSameSkyMatch,
   respondToSameSkyMatch,
-  setBlock,
   startSameSkyAttempt,
   updateSameSkyProfile,
 } from "../../lib/api";
+
+import { useSession } from "../../lib/session";
 
 const button = "border-2 border-ink bg-white px-3 py-2 text-sm font-extrabold shadow-[3px_3px_0_var(--color-shadow)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50";
 const primary = "border-2 border-ink bg-lime px-4 py-3 font-extrabold shadow-[4px_4px_0_var(--color-shadow)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50";
@@ -23,7 +22,7 @@ function MatchCard({ match, onRespond, busy }) {
     <article className={`border-4 border-ink p-5 shadow-[6px_6px_0_var(--color-shadow)] ${match.status === "connected" ? "bg-lime" : "bg-soft-purple"}`}>
       <div className="flex items-center gap-3">
         {match.person.avatar_url ? <img src={`/api${match.person.avatar_url}`} alt="" className="h-12 w-12 rounded-full border-2 border-ink object-cover" /> : <span className="grid h-12 w-12 place-items-center rounded-full border-2 border-ink bg-coral font-display text-xl font-extrabold">{match.person.username.slice(0, 1).toUpperCase()}</span>}
-        <div><p className="text-xs font-extrabold uppercase">{match.status === "connected" ? "You both said yes" : "A possible same-sky connection"}</p><h3 className="font-display text-xl font-extrabold">@{match.person.username}</h3>{match.person.bio ? <p className="text-sm">{match.person.bio}</p> : null}</div>
+        <div><p className="text-xs font-extrabold uppercase">{match.status === "connected" ? "You both said yes" : "A possible same-sky connection"}</p><h3 className="font-display text-xl font-extrabold">{match.person.username}</h3>{match.person.bio ? <p className="text-sm">{match.person.bio}</p> : null}</div>
       </div>
       <p className="mt-4 text-sm">{match.safe_explanation}</p>
       {match.they_accepted && !match.you_accepted ? <p className="mt-3 border-2 border-ink bg-lime px-3 py-2 text-sm font-extrabold">They’re open to connecting with you.</p> : null}
@@ -50,7 +49,7 @@ function DeclinedRequestCard({ match, onReopen, busy }) {
     <article className="flex flex-col gap-4 border-4 border-ink bg-soft-coral p-4 shadow-[5px_5px_0_var(--color-shadow)] sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
         {match.person.avatar_url ? <img src={`/api${match.person.avatar_url}`} alt="" className="h-11 w-11 shrink-0 rounded-full border-2 border-ink object-cover" /> : <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-ink bg-coral font-display text-lg font-extrabold text-on-brand">{match.person.username.slice(0, 1).toUpperCase()}</span>}
-        <div className="min-w-0"><h3 className="font-display text-lg font-extrabold">@{match.person.username}</h3><p className="text-xs">You declined this request. Reopen it to let them send a fresh request.</p></div>
+        <div className="min-w-0"><h3 className="font-display text-lg font-extrabold">{match.person.username}</h3><p className="text-xs">You declined this request. Reopen it to let them send a fresh request.</p></div>
       </div>
       <div className="flex shrink-0 items-center gap-3"><span className="border-2 border-ink bg-white px-2 py-1 text-xs font-extrabold uppercase">Declined</span><button type="button" className={primary} disabled={busy} onClick={() => onReopen(match)}>{busy ? "REOPENING…" : "REOPEN REQUEST"}</button></div>
     </article>
@@ -58,7 +57,7 @@ function DeclinedRequestCard({ match, onReopen, busy }) {
 }
 
 export default function SameSkyPage() {
-  const [user, setUser] = useState(null);
+  const { user, ready: sessionReady } = useSession();
   const [profile, setProfile] = useState(null);
   const [prefs, setPrefs] = useState({ timezone: "UTC", matching_enabled: false, preferred_categories: [] });
   const [attemptId, setAttemptId] = useState(null);
@@ -69,9 +68,15 @@ export default function SameSkyPage() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const reduceMotion = useReducedMotion();
+  const loadRevision = useRef(0);
+  const accountId = useRef(user?.id);
+  accountId.current = user?.id;
 
   const refresh = useCallback(async () => {
-    const data = await getSameSky();
+    const revision = ++loadRevision.current;
+    const requestedAccount = accountId.current;
+    const data = await getSameSky({ fresh: true });
+    if (revision !== loadRevision.current || requestedAccount !== accountId.current) return data;
     setProfile(data);
     setPrefs((value) => ({ ...value, timezone: data.timezone || value.timezone, matching_enabled: data.matching_enabled, preferred_categories: data.preferred_categories || [] }));
     return data;
@@ -79,9 +84,12 @@ export default function SameSkyPage() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([getMe(), getSameSky()]).then(([me, data]) => {
-      if (!active) return;
-      setUser(me);
+    if (!sessionReady) return;
+    if (!user) { setProfile(null); setAttemptId(null); setLoading(false); return; }
+    const revision = ++loadRevision.current;
+    setLoading(true);
+    getSameSky().then((data) => {
+      if (!active || revision !== loadRevision.current) return;
       setProfile(data);
       const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
       setPrefs({ timezone: data.timezone && data.timezone !== "UTC" ? data.timezone : deviceTimezone, matching_enabled: data.matching_enabled, preferred_categories: data.preferred_categories || [] });
@@ -92,9 +100,9 @@ export default function SameSkyPage() {
       else if (data.latest_attempt?.status === "match_found" && data.latest_match_status === "declined") setFlowStatus("match_declined");
       else if (data.latest_attempt?.status === "match_found" && ["blocked", "withdrawn"].includes(data.latest_match_status)) setFlowStatus("match_unavailable");
       else if (data.latest_attempt?.status === "match_found") setFlowStatus("match_found");
-    }).catch((err) => { if (active) setError(err.message); }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, []);
+    }).catch((err) => { if (active && revision === loadRevision.current) setError(err.message); }).finally(() => { if (active && revision === loadRevision.current) setLoading(false); });
+    return () => { active = false; loadRevision.current += 1; };
+  }, [sessionReady, user?.id]);
 
   useEffect(() => {
     if (!attemptId) return undefined;
@@ -130,16 +138,16 @@ export default function SameSkyPage() {
   const duplicateReviewCount = analyses.filter((analysis) => analysis.duplicate_status === "review" && analysis.processing_status === "needs_revision").length;
   const failedAnalysisCount = analyses.filter((analysis) => analysis.processing_status === "failed").length;
   const blockedStoryReasons = [
-    duplicateReviewCount ? `${duplicateReviewCount} flagged by backend duplicate checks` : "",
-    failedAnalysisCount ? `${failedAnalysisCount} stories couldn't be analyzed` : "",
+    duplicateReviewCount ? `${duplicateReviewCount} stories are too similar` : "",
+    failedAnalysisCount ? `${failedAnalysisCount} stories need another try` : "",
   ].filter(Boolean);
   const readinessMessage = hasEnoughStories
-    ? "Your analyzed stories are ready. Matching compares the saved data."
+    ? "You're ready to find your people."
     : pendingAnalysisCount
-      ? `${pendingAnalysisCount} ${pendingAnalysisCount === 1 ? "story is" : "stories are"} still being analyzed.`
+      ? `Getting ${pendingAnalysisCount === 1 ? "your story" : "your stories"} ready…`
       : blockedStoryReasons.length
-        ? `${postCount + confessionCount} stories cleared. ${blockedStoryReasons.join(" · ")}.`
-        : "New posts and confessions are analyzed after publishing.";
+        ? blockedStoryReasons.join(" · ") + "."
+        : "Share a few more stories to get started.";
   const activeMatches = useMemo(() => profile?.matches || [], [profile]);
   const cooldownSeconds = profile?.next_attempt_at ? Math.max(0, Math.ceil((new Date(profile.next_attempt_at).getTime() - countdownNow) / 1000)) : 0;
   const cooldownLabel = `${Math.floor(cooldownSeconds / 3600)}h ${Math.floor((cooldownSeconds % 3600) / 60)}m ${cooldownSeconds % 60}s`;
@@ -185,7 +193,7 @@ export default function SameSkyPage() {
 
   async function respond(matchId, accept) {
     setBusy(true); setError("");
-    try { const result = await respondToSameSkyMatch(matchId, accept); await refresh(); setNotice(result.status === "connected" ? "You both said yes. Your connection is ready for Stage 9-2." : accept ? "Your yes is saved. The other person can decide when they feel ready." : "Passed. This person will not be suggested to you again."); }
+    try { const result = await respondToSameSkyMatch(matchId, accept); await refresh(); setNotice(result.status === "connected" ? "You both said yes. You're connected!" : accept ? "Your yes is saved. The other person can decide when they feel ready." : "Passed. This person will not be suggested to you again."); }
     catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
@@ -200,21 +208,6 @@ export default function SameSkyPage() {
       window.dispatchEvent(new Event("fmlcore:notifications-change"));
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
-  }
-
-  async function blockPerson(person) {
-    if (!window.confirm(`Block @${person.username}? This also removes the Same Sky suggestion.`)) return;
-    setBusy(true); setError("");
-    try { await setBlock(person.id, true); await refresh(); setNotice("Account blocked and the suggestion removed."); }
-    catch (err) { setError(err.message); }
-    finally { setBusy(false); }
-  }
-
-  async function reportMatch(match) {
-    const reason = window.prompt("Why are you reporting this account? (harassment, hate, spam, self_harm, or other)", "other");
-    if (!reason) return;
-    await reportContent({ targetType: "user", targetId: match.person.id, reason: ["harassment", "hate", "spam", "self_harm", "other"].includes(reason) ? reason : "other", details: `Same Sky match ${match.id}` });
-    setNotice("Report sent to the moderation queue.");
   }
 
   if (loading) return <main className="mx-auto max-w-5xl px-4 py-16 font-bold">Looking up your sky…</main>;
@@ -255,7 +248,7 @@ export default function SameSkyPage() {
         </motion.div> : null}
       </AnimatePresence>
 
-      {["no_match", "match_declined", "match_unavailable"].includes(flowStatus) ? <motion.section initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="relative mt-7 overflow-hidden border-4 border-ink bg-gradient-to-br from-[#ffe2c6] via-[#ffb9a7] to-[#f7c3dc] p-6 text-center shadow-[7px_7px_0_var(--color-shadow)] sm:p-9"><span className="pointer-events-none absolute -right-3 top-2 rotate-12 text-7xl text-white/45" aria-hidden>✦</span><span className="pointer-events-none absolute bottom-1 left-4 -rotate-12 text-5xl text-white/45" aria-hidden>✧</span><motion.div className="relative mx-auto grid h-16 w-16 place-items-center rounded-full border-2 border-ink bg-[#fff4d8] text-3xl text-[#ef594d] shadow-[3px_3px_0_var(--color-shadow)]" animate={reduceMotion ? undefined : { rotate: [0, 12, -12, 0], scale: [1, 1.08, 1] }} transition={{ duration: 3, repeat: Infinity }}>☄</motion.div><p className="relative mt-4 font-note text-3xl">your orbit is still unfolding.</p><h2 className="relative mt-1 font-display text-3xl font-extrabold">{flowStatus === "match_declined" ? "THAT CONNECTION CLOSED" : flowStatus === "match_unavailable" ? "CONNECTION NO LONGER AVAILABLE" : "NO MATCH FOUND"}</h2><p className="relative mt-2">{flowStatus === "match_declined" ? "They passed on the connection. You can look for someone new." : flowStatus === "match_unavailable" ? "That connection ended. You can look for someone new." : "Your next try unlocks in"}</p><strong className="relative mt-1 inline-block rounded-full border-2 border-ink bg-[#fff8ed]/80 px-5 py-2 font-display text-2xl tabular-nums shadow-[3px_3px_0_var(--color-shadow)]">{cooldownSeconds > 0 ? cooldownLabel : "READY WHEN YOU ARE"}</strong>{cooldownSeconds > 0 ? <p className="relative mt-2 text-xs font-semibold">Come back when the timer reaches zero.</p> : null}<button className={`${primary} relative mt-4`} onClick={startMatching} disabled={busy || cooldownSeconds > 0}>{busy ? "SEARCHING…" : cooldownSeconds > 0 ? "TRY AGAIN SOON" : "TRY AGAIN"}</button></motion.section> : null}
+      {["no_match", "match_declined", "match_unavailable"].includes(flowStatus) ? <motion.section initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="relative mt-7 overflow-hidden border-4 border-ink bg-gradient-to-br from-[#ffe2c6] via-[#ffb9a7] to-[#f7c3dc] p-6 text-center shadow-[7px_7px_0_var(--color-shadow)] sm:p-9"><span className="pointer-events-none absolute -right-3 top-2 rotate-12 text-7xl text-white/45" aria-hidden>✦</span><span className="pointer-events-none absolute bottom-1 left-4 -rotate-12 text-5xl text-white/45" aria-hidden>✧</span><motion.div className="relative mx-auto grid h-16 w-16 place-items-center rounded-full border-2 border-ink bg-[#fff4d8] text-3xl text-[#ef594d] shadow-[3px_3px_0_var(--color-shadow)]" animate={reduceMotion ? undefined : { rotate: [0, 12, -12, 0], scale: [1, 1.08, 1] }} transition={{ duration: 3, repeat: Infinity }}>☄</motion.div><p className="relative mt-4 font-note text-3xl">your orbit is still unfolding.</p><h2 className="relative mt-1 font-display text-3xl font-extrabold">{flowStatus === "match_declined" ? "THAT CONNECTION CLOSED" : flowStatus === "match_unavailable" ? "CONNECTION NO LONGER AVAILABLE" : "NO MATCH FOUND"}</h2>{flowStatus !== "no_match" || cooldownSeconds > 0 ? <p className="relative mt-2">{flowStatus === "match_declined" ? "They passed on the connection. You can look for someone new." : flowStatus === "match_unavailable" ? "That connection ended. You can look for someone new." : "Your next try unlocks in"}</p> : null}{cooldownSeconds > 0 ? <strong className="relative mt-1 inline-block rounded-full border-2 border-ink bg-[#fff8ed]/80 px-5 py-2 font-display text-2xl tabular-nums shadow-[3px_3px_0_var(--color-shadow)]">{cooldownLabel}</strong> : null}{cooldownSeconds > 0 ? <p className="relative mt-2 text-xs font-semibold">Come back when the timer reaches zero.</p> : null}<button className={`${primary} relative mt-4`} onClick={startMatching} disabled={busy || cooldownSeconds > 0}>{busy ? "SEARCHING…" : cooldownSeconds > 0 ? "TRY AGAIN SOON" : "TRY AGAIN"}</button></motion.section> : null}
 
       {activeMatches.length ? <section className="mt-8"><p className="font-note text-2xl">one possible connection at a time</p><h2 className="font-display text-3xl font-extrabold">UNDER THE SAME SKY</h2><div className="mt-4 grid gap-4 md:grid-cols-2">{activeMatches.map((match) => <MatchCard key={match.id} match={match} onRespond={respond} busy={busy} />)}</div></section> : null}
 

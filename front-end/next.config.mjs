@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: "standalone",
+  // Keep the local framework badge from covering the mobile Home destination.
+  devIndicators: false,
   // Verification builds must not overwrite a running dev server's manifest.
   distDir: process.env.NEXT_BUILD_DIR || ".next",
   async rewrites() {

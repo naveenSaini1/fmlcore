@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getMe } from "../api";
+import { useSession } from "../session";
 import { getWsTicket } from "../chatApi";
 import { WebSocketClient } from "./WebSocketClient";
+import { attachLiveUpdates } from "../live-updates";
+import { setLiveReady } from "../live-sync";
+import { invalidateApiReads } from "../api";
 import { WebSocketContext } from "./WebSocketContext";
 
 export function WebSocketProvider({ children }) {
   const clientRef = useRef(null);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [status, setStatus] = useState("disconnected");
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user: currentUser, ready: sessionReady } = useSession();
 
   // Initialize client singleton once
   if (!clientRef.current && typeof window !== "undefined") {
@@ -28,54 +32,40 @@ export function WebSocketProvider({ children }) {
 
     const unsubscribe = client.onStatusChange((newStatus) => {
       setStatus(newStatus);
+      if (newStatus !== "connected") setLiveReady(false);
     });
 
     return unsubscribe;
   }, []);
 
-  // Handle auth checks and connection lifecycle
+  // One shared stream drives the badge and any open inbox. No polling timers.
   useEffect(() => {
-    let active = true;
-
-    const syncAuthAndConnect = async () => {
-      const client = clientRef.current;
-      if (!client) return;
-
-      try {
-        const user = await getMe();
-        if (!active) return;
-        if (user) {
-          setCurrentUser(user);
-          client.connect();
-        } else {
-          setCurrentUser(null);
-          client.disconnect();
-        }
-      } catch {
-        if (!active) return;
-        setCurrentUser(null);
-        client.disconnect();
-      }
-    };
-
-    syncAuthAndConnect();
-
-    const handleAuthChange = () => {
-      syncAuthAndConnect();
-    };
-
-    window.addEventListener("fmlcore:auth-change", handleAuthChange);
-    return () => {
-      active = false;
-      window.removeEventListener("fmlcore:auth-change", handleAuthChange);
-    };
+    const client = clientRef.current;
+    if (!client) return undefined;
+    return attachLiveUpdates(client, {
+      invalidate: invalidateApiReads,
+      notify: (name) => window.dispatchEvent(new Event(name)),
+      setReady: setLiveReady,
+      setUnread: setChatUnreadCount,
+    });
   }, []);
+
+  // Profile/theme edits keep the connection; account changes replace it.
+  useEffect(() => {
+    const client = clientRef.current;
+    if (!client || !sessionReady) return undefined;
+    setChatUnreadCount(0);
+    if (currentUser?.id) client.connect();
+    else client.disconnect();
+    return () => { setLiveReady(false); client.disconnect(); };
+  }, [sessionReady, currentUser?.id]);
 
   const value = {
     client: clientRef.current,
     status,
     isConnected: status === "connected",
     currentUser,
+    chatUnreadCount,
   };
 
   return (

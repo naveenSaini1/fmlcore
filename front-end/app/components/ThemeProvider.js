@@ -1,83 +1,77 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { getMe, getPlatformDefaultTheme, updateTheme } from "../../lib/api";
+import { getPlatformDefaultTheme, updateTheme } from "../../lib/api";
+import { useSession } from "../../lib/session";
 import { isThemeKey } from "../../lib/themes";
 
 const ThemeContext = createContext(null);
 const GUEST_THEME_KEY = "fmlcore-guest-theme";
 const DEFAULT_THEME = "acid-lime";
+function readLocal() {
+  try { return window.localStorage.getItem(GUEST_THEME_KEY); } catch { return null; }
+}
+function writeLocal(value) {
+  try { window.localStorage.setItem(GUEST_THEME_KEY, value); } catch { /* Storage is optional. */ }
+}
 
 export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(DEFAULT_THEME);
-  const [userId, setUserId] = useState(null);
-  const [ready, setReady] = useState(false);
+  const { user, ready: sessionReady } = useSession();
+  const userId = user?.id;
+  const [platformTheme, setPlatformTheme] = useState(DEFAULT_THEME);
+  const [platformReady, setPlatformReady] = useState(false);
+  const ready = sessionReady && platformReady;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const saveQueue = useRef(Promise.resolve());
-  const saveSequence = useRef(0);
+  const savingRef = useRef(false);
 
   useEffect(() => {
-    const guestTheme = window.localStorage.getItem(GUEST_THEME_KEY);
+    const guestTheme = readLocal();
     if (isThemeKey(guestTheme)) {
       setThemeState(guestTheme);
       document.documentElement.dataset.theme = guestTheme;
     }
-
     let alive = true;
-    async function syncAccountTheme() {
-      const platformTheme = await getPlatformDefaultTheme().then((result) => result.theme).catch(() => DEFAULT_THEME);
-      if (!alive) return;
-      try {
-        const user = await getMe();
-        if (!alive) return;
-        setUserId(user.id);
-        const accountTheme = isThemeKey(user.theme) ? user.theme : platformTheme;
-        setThemeState(accountTheme);
-        document.documentElement.dataset.theme = accountTheme;
-      } catch {
-        if (!alive) return;
-        setUserId(null);
-        const localTheme = isThemeKey(guestTheme) ? guestTheme : platformTheme;
-        setThemeState(localTheme);
-        document.documentElement.dataset.theme = localTheme;
-      } finally {
-        if (alive) setReady(true);
-      }
-    }
-
-    syncAccountTheme();
-    const onAuthChange = () => {
-      setReady(false);
-      syncAccountTheme();
-    };
-    window.addEventListener("fmlcore:auth-change", onAuthChange);
-    return () => {
-      alive = false;
-      window.removeEventListener("fmlcore:auth-change", onAuthChange);
-    };
+    getPlatformDefaultTheme().then((result) => {
+      if (alive) setPlatformTheme(isThemeKey(result.theme) ? result.theme : DEFAULT_THEME);
+    }).catch(() => {}).finally(() => { if (alive) setPlatformReady(true); });
+    return () => { alive = false; };
   }, []);
 
+  useEffect(() => {
+    if (!ready) return;
+    const preferred = user ? user.theme : readLocal();
+    const next = isThemeKey(preferred) ? preferred : platformTheme;
+    setThemeState(next);
+    document.documentElement.dataset.theme = next;
+  }, [ready, user?.id, user?.theme, platformTheme]);
+
   const chooseTheme = useCallback(async (nextTheme) => {
-    if (!isThemeKey(nextTheme)) return;
+    if (!isThemeKey(nextTheme) || !ready || savingRef.current || nextTheme === theme) return false;
+    const previous = theme;
     setThemeState(nextTheme);
     document.documentElement.dataset.theme = nextTheme;
     setError("");
     if (!userId) {
-      window.localStorage.setItem(GUEST_THEME_KEY, nextTheme);
-      return;
+      writeLocal(nextTheme);
+      return true;
     }
-    const sequence = ++saveSequence.current;
+    savingRef.current = true;
     setSaving(true);
-    saveQueue.current = saveQueue.current.catch(() => {}).then(() => updateTheme(nextTheme));
     try {
-      await saveQueue.current;
+      await updateTheme(nextTheme);
+      return true;
     } catch (err) {
-      if (sequence === saveSequence.current) setError(err.message);
+      setThemeState(previous);
+      document.documentElement.dataset.theme = previous;
+      setError(err.message || "Could not save your colors.");
+      return false;
     } finally {
-      if (sequence === saveSequence.current) setSaving(false);
+      savingRef.current = false;
+      setSaving(false);
     }
-  }, [userId]);
+  }, [userId, ready, theme]);
 
   return (
     <ThemeContext.Provider value={{ theme, chooseTheme, ready, saving, error }}>

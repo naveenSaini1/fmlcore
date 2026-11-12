@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { getMe, updateSkin } from "../../lib/api";
+import { updateSkin } from "../../lib/api";
+import { useSession } from "../../lib/session";
 import { DEFAULT_SKIN, isSkinId } from "../../lib/skins";
 
 const SkinContext = createContext(null);
@@ -18,8 +19,8 @@ function writeLocal(key, value) {
 
 export function SkinProvider({ children }) {
   const [skin, setSkinState] = useState(DEFAULT_SKIN);
-  const [userId, setUserId] = useState(null);
-  const [ready, setReady] = useState(false);
+  const { user, ready } = useSession();
+  const userId = user?.id;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const queue = useRef(Promise.resolve());
@@ -32,30 +33,14 @@ export function SkinProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    let alive = true;
     const cached = readLocal(CACHE_KEY);
     if (isSkinId(cached)) apply(cached);
-    let generation = 0;
-    async function sync() {
-      const request = ++generation;
-      try {
-        const user = await getMe();
-        if (!alive || request !== generation) return;
-        setUserId(user.id);
-        writeLocal(CACHE_KEY, apply(user.skin));
-      } catch {
-        if (!alive || request !== generation) return;
-        setUserId(null);
-        writeLocal(CACHE_KEY, apply(readLocal(GUEST_SKIN_KEY)));
-      } finally {
-        if (alive && request === generation) setReady(true);
-      }
-    }
-    sync();
-    const onAuth = () => { setReady(false); sync(); };
-    window.addEventListener("fmlcore:auth-change", onAuth);
-    return () => { alive = false; window.removeEventListener("fmlcore:auth-change", onAuth); };
   }, [apply]);
+
+  useEffect(() => {
+    if (!ready) return;
+    writeLocal(CACHE_KEY, apply(user ? user.skin : readLocal(GUEST_SKIN_KEY)));
+  }, [apply, ready, user?.id, user?.skin]);
 
   const chooseSkin = useCallback(async (next) => {
     if (!isSkinId(next) || !ready || saving) return false;

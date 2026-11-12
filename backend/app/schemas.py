@@ -24,8 +24,8 @@ class SignupIn(BaseModel):
     @field_validator("password")
     @classmethod
     def password_ok(cls, value: str) -> str:
-        if len(value) < 8 or len(value) > 72:
-            raise ValueError("Use 8 to 72 characters.")
+        if len(value) < 8 or len(value.encode("utf-8")) > 72:
+            raise ValueError("Use at least 8 characters and at most 72 UTF-8 bytes.")
         return value
 
     @field_validator("age_confirmed")
@@ -110,6 +110,15 @@ class UserOut(BaseModel):
     theme: str
     skin: str
     avatar_url: str | None
+    joined_at: datetime
+
+
+class PublicProfileOut(BaseModel):
+    username: str
+    bio: str
+    avatar_url: str | None
+    profile_color: str
+    profile_sticker: str
     joined_at: datetime
 
 

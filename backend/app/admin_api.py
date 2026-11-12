@@ -327,7 +327,6 @@ def admin_match_explorer(
                 SameSkyEmbedding.embedding_version == settings.gemini_embedding_version,
             )
             .order_by(SameSkyEmbedding.embedding.cosine_distance(source_embedding.embedding))
-            .limit(180)
         ).all()
         for candidate_post, candidate_analysis, _embedding, distance in neighbours:
             evaluated += 1
@@ -523,8 +522,8 @@ def admin_match_explorer(
         "preview_is_matchable": bool(profile and profile.matching_enabled and profile_ready),
         "blockers": blockers,
         "candidate_stories_evaluated": evaluated,
-        "candidates": candidates[:20],
-        "below_threshold": rejected_by_score[:10],
+        "candidates": candidates,
+        "below_threshold": rejected_by_score,
         "excluded_accounts": excluded,
     }
 

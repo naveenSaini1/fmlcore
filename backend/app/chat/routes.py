@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.chat.schemas import (
     ChatConversationDetailOut,
+    ChatIdentityIn,
     ChatConversationSummaryOut,
     ChatMessageListOut,
     ChatUnreadCountOut,
@@ -14,6 +15,7 @@ from app.chat.schemas import (
 )
 from app.chat.service import (
     get_conversation_detail,
+    message_to_out,
     get_conversation_messages,
     get_total_unread_count,
     get_user_conversations,
@@ -22,10 +24,13 @@ from app.chat.service import (
 )
 from app.db import get_db
 from app.limiter import limit
-from app.models import User
+from app.models import User, ChatParticipant
+from app.chat.identity import participant_identity
+from app.safety import relationship_blocked
+from sqlalchemy import select
 from app.security import read_user_id
 from app.websocket.auth import create_ws_ticket
-from app.websocket.events import CHAT_MESSAGE, CHAT_MESSAGE_DELIVERED, CHAT_MESSAGE_READ, CHAT_MESSAGE_SENT
+from app.websocket.events import CHAT_IDENTITY_CHANGED, CHAT_MESSAGE, CHAT_MESSAGE_DELIVERED, CHAT_MESSAGE_READ, CHAT_MESSAGE_SENT
 from app.websocket.manager import ws_manager
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -94,20 +99,12 @@ async def send_message_rest(
     )
 
     # Deliver via WebSocket to recipient if online
-    msg_payload = {
-        "id": str(msg.id),
-        "conversation_id": str(msg.conversation_id),
-        "sender_id": str(msg.sender_id),
-        "sender_username": user.username,
-        "content": msg.content,
-        "message_type": msg.message_type,
-        "created_at": msg.created_at.isoformat(),
-        "status": "delivered" if ws_manager.is_user_online(recipient_id) else "sent",
-    }
+    msg_payload = message_to_out(msg, user.id, db).model_dump(mode="json")
+    recipient_payload = message_to_out(msg, recipient_id, db).model_dump(mode="json")
     await ws_manager.send_to_user(
         user_id=recipient_id,
         event=CHAT_MESSAGE,
-        data={"conversation_id": str(conversation_id), "message": msg_payload},
+        data={"conversation_id": str(conversation_id), "message": recipient_payload},
     )
 
     return msg_payload
@@ -135,7 +132,7 @@ async def mark_read(
             event=CHAT_MESSAGE_READ,
             data={
                 "conversation_id": str(conversation_id),
-                "read_by_user_id": str(user.id),
+                "read_by_user_id": str(participant_identity(db, conversation_id, user.id, other_id).user_id),
                 "read_at": read_at.isoformat(),
                 "count": count,
             },
@@ -161,3 +158,22 @@ def get_websocket_ticket(
     """Issue a short-lived ticket token for WebSocket authentication."""
     ticket = create_ws_ticket(user_id=user.id, ttl_seconds=120)
     return WSTicketOut(ticket=ticket, expires_in=120)
+
+
+@router.patch("/conversations/{conversation_id}/identity", response_model=ChatConversationDetailOut)
+async def update_identity(conversation_id: uuid.UUID, body: ChatIdentityIn,
+    db: Session = Depends(get_db), user: User = Depends(chat_user)):
+    get_conversation_detail(db, conversation_id, user.id)
+    parts = db.scalars(select(ChatParticipant).where(ChatParticipant.conversation_id == conversation_id).order_by(ChatParticipant.user_id).with_for_update()).all()
+    own = next(p for p in parts if p.user_id == user.id)
+    other = next(p for p in parts if p.user_id != user.id)
+    if relationship_blocked(db, user.id, other.user_id):
+        raise HTTPException(403, "This connection is unavailable.")
+    if "nickname" in body.model_fields_set:
+        own.nickname = (body.nickname.strip() or None) if body.nickname else None
+    if body.profile_revealed is not None:
+        own.profile_revealed = body.profile_revealed
+    db.commit()
+    # No identity fields in the event: each viewer reloads their authorized view.
+    await ws_manager.send_to_users([user.id, other.user_id], event=CHAT_IDENTITY_CHANGED, data={"conversation_id": str(conversation_id)})
+    return get_conversation_detail(db, conversation_id, user.id)

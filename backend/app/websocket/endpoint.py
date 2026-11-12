@@ -84,6 +84,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
     # 5. Receive loop
     try:
+        from app.chat.realtime import push_chat_unread
+
+        # Initial/reconnect snapshot, without a separate browser HTTP request.
+        await push_chat_unread(user_id)
         while True:
             raw_text = await websocket.receive_text()
             if not raw_text.strip():
@@ -145,7 +149,21 @@ async def handle_presence_query(
             valid_uids.append(UUID(str(r)))
         except (ValueError, TypeError):
             pass
-    online_uids = [str(uid) for uid in ws_manager.get_online_users(valid_uids)]
+    from app.db import SessionLocal
+    from app.models import ChatParticipant
+    from app.chat.identity import participant_identity
+    from app.safety import relationship_blocked
+    from sqlalchemy import select
+    online_uids = []
+    with SessionLocal() as db:
+        parts = db.scalars(select(ChatParticipant).where(ChatParticipant.user_id == connection.user_id)).all()
+        for part in parts:
+            for other in part.conversation.participants:
+                if other.user_id == connection.user_id or relationship_blocked(db, connection.user_id, other.user_id):
+                    continue
+                identity = participant_identity(db, part.conversation_id, other.user_id, connection.user_id)
+                if identity.user_id in valid_uids and identity.is_online:
+                    online_uids.append(str(identity.user_id))
     await connection.send_event(
         event=PRESENCE_STATUS,
         data={"online_user_ids": online_uids},

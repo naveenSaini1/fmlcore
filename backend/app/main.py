@@ -18,6 +18,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import UPLOAD_DIR, settings
+from app.leaderboard_live import router as leaderboard_live_router
+from app.browser_push import router as browser_push_router
+from app.notification_realtime import start_notification_listener, stop_notification_listener
 from app.db import get_db
 from app.limiter import limit
 from app.models import (
@@ -48,11 +51,11 @@ from app.posts import (
 )
 from app.schemas import (
     AuthorOut,
+    PublicProfileOut,
     CommentIn,
     CommentOut,
     CommentsOut,
     FeedOut,
-    LoginIn,
     LeaderboardEntryOut,
     LeaderboardOut,
     NotificationOut,
@@ -64,17 +67,12 @@ from app.schemas import (
     SkinIn,
     SafetyUserOut,
     SafetyUsersOut,
-    SignupIn,
     ThemeIn,
     UserOut,
 )
 from app.safety import hidden_author_ids, queue_notification, relationship_blocked
 from app.security import (
-    cookie_kwargs,
-    hash_password,
-    make_token,
     read_user_id,
-    verify_password,
 )
 from app.taxonomy import CATEGORIES, CATEGORY_SET, MOOD_KEYS, MOOD_SET, REACTION_SET
 from app.users import find_by_email, find_by_username, remove_file, sniff_image, to_public
@@ -82,6 +80,7 @@ from app.same_sky_api import include_post_for_matching, router as same_sky_route
 from app.admin_api import router as admin_router
 from app.websocket import ws_endpoint_router
 from app.chat import chat_router
+from app.auth_api import router as auth_router
 from app.same_sky_common import invalidate_matches, update_eligibility
 from app.system_settings import default_theme
 
@@ -108,7 +107,10 @@ def archive_records(db: Session, history_model, rows: list, deleted_by: uuid.UUI
 app = FastAPI(title="FMLCore", version="0.9.0")
 app.include_router(same_sky_router)
 app.include_router(admin_router)
+app.include_router(leaderboard_live_router)
+app.include_router(browser_push_router)
 app.include_router(chat_router)
+app.include_router(auth_router)
 app.include_router(ws_endpoint_router)
 
 DAILY_PROMPTS = [
@@ -142,6 +144,16 @@ def startup() -> None:
         raise RuntimeError("SAME_SKY_HASH_SECRET must be set before processing private Same Sky entries.")
 
 
+@app.on_event("startup")
+async def start_live_notifications() -> None:
+    await start_notification_listener(app)
+
+
+@app.on_event("shutdown")
+async def stop_live_notifications() -> None:
+    await stop_notification_listener(app)
+
+
 def current_user(request: Request, db: Session = Depends(get_db)) -> User:
     user = db.get(User, read_user_id(request))
     if user is None:
@@ -172,7 +184,8 @@ def analyze_new_post_for_matching(db: Session, post: Post, user: User) -> None:
 
 def notification_to_public(notification: Notification) -> NotificationOut:
     actor = None
-    if notification.actor is not None and not notification.actor_anonymous:
+    match_notification = notification.kind.startswith("same_sky_")
+    if notification.actor is not None and not notification.actor_anonymous and not match_notification:
         avatar = (
             f"/media/avatars/{notification.actor.avatar_file}"
             if notification.actor.avatar_file
@@ -189,7 +202,7 @@ def notification_to_public(notification: Notification) -> NotificationOut:
         id=notification.id,
         kind=notification.kind,
         actor=actor,
-        is_anonymous=notification.actor_anonymous,
+        is_anonymous=notification.actor_anonymous or match_notification,
         post_id=notification.post_id,
         comment_id=notification.comment_id,
         same_sky_match_id=notification.same_sky_match_id,
@@ -206,47 +219,6 @@ def health() -> dict:
 @app.get("/platform/default-theme")
 def get_platform_default_theme(db: Session = Depends(get_db)) -> dict:
     return {"theme": default_theme(db)}
-
-
-@app.post("/auth/signup", response_model=UserOut)
-def signup(body: SignupIn, request: Request, response: Response, db: Session = Depends(get_db)):
-    limit(request, "signup", max_hits=8, window_seconds=600)
-    email = body.email.lower()
-    if find_by_email(db, email):
-        raise HTTPException(status_code=409, detail="That email already has an account.")
-    if find_by_username(db, body.username):
-        raise HTTPException(status_code=409, detail="That username is taken.")
-
-    user = User(
-        email=email,
-        username=body.username,
-        username_lower=body.username.lower(),
-        password_hash=hash_password(body.password),
-        bio="",
-        theme=default_theme(db),
-        last_login_at=datetime.now(timezone.utc),
-    )
-    db.add(user)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="That email or username is already used.")
-    db.refresh(user)
-    response.set_cookie(**cookie_kwargs(make_token(user.id)))
-    return to_public(user)
-
-
-@app.post("/auth/login", response_model=UserOut)
-def login(body: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
-    limit(request, "login", max_hits=10, window_seconds=300)
-    user = find_by_email(db, body.email.lower())
-    if user is None or not verify_password(body.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Email or password is wrong.")
-    user.last_login_at = datetime.now(timezone.utc)
-    db.commit()
-    response.set_cookie(**cookie_kwargs(make_token(user.id)))
-    return to_public(user)
 
 
 @app.post("/auth/logout")
@@ -529,6 +501,55 @@ def list_my_reported_posts(db: Session = Depends(get_db), user: User = Depends(c
         "reported_at": report.created_at.isoformat(), "post": {"id": str(post.id), "body": post.body,
         "category": post.category, "mood": post.mood, "is_anonymous": post.is_anonymous,
         "created_at": post.created_at.isoformat()}} for report, post in rows]}
+
+
+def public_profile_user(db: Session, username: str, viewer: User | None) -> User:
+    target = find_by_username(db, username)
+    if target is None or (viewer and relationship_blocked(db, viewer.id, target.id)):
+        raise HTTPException(status_code=404, detail="Profile not found.")
+    return target
+
+
+@app.get("/users/{username}", response_model=PublicProfileOut)
+def public_profile(username: str, db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
+    target = public_profile_user(db, username, user)
+    return PublicProfileOut(username=target.username, bio=target.bio or "",
+        avatar_url=f"/media/avatars/{target.avatar_file}" if target.avatar_file else None,
+        profile_color=target.profile_color, profile_sticker=target.profile_sticker, joined_at=target.created_at)
+
+
+@app.get("/users/{username}/posts", response_model=FeedOut)
+def public_profile_posts(username: str, surface: str = "feed", cursor: str | None = None,
+    limit: int = 20, db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
+    target = public_profile_user(db, username, user)
+    if surface not in {"feed", "confession"}:
+        raise HTTPException(422, "Choose posts or confessions.")
+    size = max(1, min(limit, 50))
+    stmt = select(Post).options(joinedload(Post.author)).where(
+        Post.author_id == target.id, Post.visibility == "public",
+        Post.is_anonymous.is_(False), Post.surface == surface,
+    ).order_by(Post.created_at.desc(), Post.id.desc()).limit(size + 1)
+    if user and target.id in hidden_author_ids(db, user.id):
+        return FeedOut(posts=[], next_cursor=None)
+    if cursor:
+        try:
+            stamp, _, key = cursor.partition("|")
+            before = datetime.fromisoformat(stamp)
+            if before.tzinfo is None:
+                raise ValueError()
+            cursor_id = uuid.UUID(key)
+        except ValueError:
+            raise HTTPException(400, "Bad cursor.")
+        stmt = stmt.where((Post.created_at < before) | ((Post.created_at == before) & (Post.id < cursor_id)))
+    rows = db.scalars(stmt).all()
+    more = len(rows) > size
+    rows = rows[:size]
+    ids = [p.id for p in rows]
+    reactions = reaction_counts_for(db, ids)
+    mine = my_reactions_for(db, user.id if user else None, ids)
+    comments = comment_counts_for(db, ids)
+    return FeedOut(posts=[post_to_public(p, reactions.get(p.id, {}), mine.get(p.id), comments.get(p.id, 0)) for p in rows],
+        next_cursor=f"{rows[-1].created_at.isoformat()}|{rows[-1].id}" if more and rows else None)
 
 
 @app.patch("/profile", response_model=UserOut)
@@ -909,6 +930,7 @@ def leaderboard(
         select(Post, weekly_votes.c.votes)
         .options(joinedload(Post.author))
         .join(weekly_votes, weekly_votes.c.post_id == Post.id)
+        .where(Post.visibility == "public")
         .order_by(weekly_votes.c.votes.desc(), Post.created_at.desc(), Post.id.desc())
         .offset(start)
         .limit(size + 1)

@@ -2,9 +2,10 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from app.chat.service import mark_conversation_read, send_message
+from app.chat.service import mark_conversation_read, send_message, message_to_out
 from app.db import SessionLocal
-from app.models import ChatParticipant, User
+from app.chat.identity import participant_identity
+from app.models import ChatParticipant
 from app.websocket.connection import WebSocketConnection
 from app.websocket.events import (
     CHAT_MESSAGE,
@@ -51,8 +52,6 @@ async def handle_chat_message_send(
         return
 
     with SessionLocal() as db:
-        sender = db.get(User, connection.user_id)
-        sender_username = sender.username if sender else ""
         try:
             msg, recipient_id = send_message(
                 db=db,
@@ -70,18 +69,9 @@ async def handle_chat_message_send(
             return
 
         is_recipient_online = ws_manager.is_user_online(recipient_id)
-        status = "delivered" if is_recipient_online else "sent"
 
-        msg_payload = {
-            "id": str(msg.id),
-            "conversation_id": str(msg.conversation_id),
-            "sender_id": str(msg.sender_id),
-            "sender_username": sender_username,
-            "content": msg.content,
-            "message_type": msg.message_type,
-            "created_at": msg.created_at.isoformat(),
-            "status": status,
-        }
+        msg_payload = message_to_out(msg, connection.user_id, db).model_dump(mode="json")
+        recipient_payload = message_to_out(msg, recipient_id, db).model_dump(mode="json")
 
     # 1. Send confirmation to sender
     await connection.send_event(
@@ -101,7 +91,7 @@ async def handle_chat_message_send(
             event=CHAT_MESSAGE,
             data={
                 "conversation_id": str(conversation_id),
-                "message": msg_payload,
+                "message": recipient_payload,
             },
         )
         # Notify sender of delivery
@@ -131,6 +121,7 @@ async def handle_chat_typing_start(
         return
 
     with SessionLocal() as db:
+        participant_identity(db, conv_id, connection.user_id, connection.user_id)
         # Find other participant
         other_part = db.query(ChatParticipant).filter(
             ChatParticipant.conversation_id == conv_id,
@@ -139,16 +130,16 @@ async def handle_chat_typing_start(
         if not other_part:
             return
 
-        sender = db.get(User, connection.user_id)
-        sender_username = sender.username if sender else ""
         recipient_id = other_part.user_id
+        identity = participant_identity(db, conv_id, connection.user_id, recipient_id)
+        sender_username = identity.username
 
     await ws_manager.send_to_user(
         user_id=recipient_id,
         event=CHAT_TYPING_START,
         data={
             "conversation_id": str(conv_id),
-            "user_id": str(connection.user_id),
+            "user_id": str(identity.user_id),
             "username": sender_username,
         },
     )
@@ -178,13 +169,14 @@ async def handle_chat_typing_stop(
         if not other_part:
             return
         recipient_id = other_part.user_id
+        identity = participant_identity(db, conv_id, connection.user_id, recipient_id)
 
     await ws_manager.send_to_user(
         user_id=recipient_id,
         event=CHAT_TYPING_STOP,
         data={
             "conversation_id": str(conv_id),
-            "user_id": str(connection.user_id),
+            "user_id": str(identity.user_id),
         },
     )
 
@@ -212,13 +204,15 @@ async def handle_chat_message_read(
             user_id=connection.user_id,
         )
 
+        reader_id = participant_identity(db, conv_id, connection.user_id, other_id).user_id if other_id else None
+
     if other_id and count > 0:
         await ws_manager.send_to_user(
             user_id=other_id,
             event=CHAT_MESSAGE_READ,
             data={
                 "conversation_id": str(conv_id),
-                "read_by_user_id": str(connection.user_id),
+                "read_by_user_id": str(reader_id),
                 "read_at": read_at.isoformat(),
                 "count": count,
             },

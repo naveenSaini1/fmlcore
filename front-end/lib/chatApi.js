@@ -34,3 +34,7 @@ export function getChatUnreadCount() {
 export function getWsTicket() {
   return api("/chat/ws-ticket");
 }
+
+export function updateChatIdentity(conversationId, changes) {
+  return api(`/chat/conversations/${conversationId}/identity`, { method: "PATCH", body: JSON.stringify(changes) });
+}

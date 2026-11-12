@@ -1,0 +1,2 @@
+export const metadata = { title: 'Top Painer — weekly stories', description: 'The stories that hit home, ranked by reactions received over the last seven days.', alternates: { canonical: "/leaderboard" }, openGraph: { title: 'Top Painer — weekly stories', description: 'The stories that hit home, ranked by reactions received over the last seven days.', url: "/leaderboard" } };
+export default function Layout({ children }) { return children; }

@@ -1,0 +1,24 @@
+/* One quiet panel with compact ranked rows, rather than nested story cards. */
+html[data-skin] .community-panel { padding: 20px 18px 10px; background: var(--color-white); border: 1px solid var(--theme-border); border-radius: 14px; box-shadow: none; }
+.leaderboard-panel-heading { margin-bottom: 10px; }
+.leaderboard-eyebrow { font-family: var(--font-body); font-size: 9px; font-weight: 650; letter-spacing: .13em; color: var(--theme-muted); }
+html[data-skin] .community-panel .leaderboard-panel-heading h2 { display: flex; align-items: center; justify-content: space-between; margin-top: 5px; font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -.03em; line-height: 1.3; }
+.leaderboard-panel-heading h2 > span { font-family: var(--font-body); font-size: 16px; color: var(--theme-muted); }
+.leaderboard-description { margin-top: 5px; font-size: 11px; line-height: 1.5; color: var(--theme-muted); }
+.leaderboard-list { margin: 0; padding: 0; list-style: none; }
+html[data-skin] .community-panel .leaderboard-row { margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--theme-border); background: transparent; }
+html[data-skin] .community-panel .leaderboard-row:last-child { border-bottom: 0; }
+.leaderboard-entry { display: grid; grid-template-columns: 20px minmax(0,1fr) 30px; gap: 9px; align-items: start; padding: 13px 0; border-radius: 6px; }
+html[data-skin] .community-panel .leaderboard-entry:hover { transform: none; background: var(--theme-tint); }
+.leaderboard-rank { padding-top: 1px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--theme-muted); }
+.leaderboard-row:first-child .leaderboard-rank { color: var(--theme-accent); font-weight: 800; }
+.leaderboard-story { min-width: 0; }
+.leaderboard-author { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 12px; line-height: 1.4; font-weight: 600; }
+.leaderboard-author > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard-sticker { flex-shrink: 0; font-size: 11px; }
+html[data-skin] .community-panel .leaderboard-row .leaderboard-excerpt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; margin: 4px 0 0; font-family: var(--font-body); font-size: 12px; font-weight: 400; line-height: 1.45; color: var(--theme-muted); }
+.leaderboard-votes { display: flex; flex-direction: column; align-items: flex-end; padding-top: 1px; font-size: 9px; line-height: 1.5; color: var(--theme-muted); }
+.leaderboard-votes strong { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--color-ink); }
+html[data-skin] .community-panel > .leaderboard-view-all { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin-top: 4px; padding: 10px 0 5px; border: 0; border-top: 1px solid var(--theme-border); border-radius: 0; background: transparent; color: var(--theme-accent); font-size: 12px; font-weight: 600; box-shadow: none; }
+html[data-skin="calm"] .community-panel { border: 3px solid var(--color-ink); border-radius: 0; box-shadow: 5px 5px 0 var(--color-shadow); }
+html[data-skin="frappe"] .community-panel { border-radius: 8px; }

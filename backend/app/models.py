@@ -28,7 +28,9 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     username: Mapped[str] = mapped_column(String(20), unique=True, index=True)
     username_lower: Mapped[str] = mapped_column(String(20), unique=True, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    google_subject: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     bio: Mapped[str] = mapped_column(String(160), default="", server_default="")
     avatar_file: Mapped[str | None] = mapped_column(String(255), nullable=True)
     profile_color: Mapped[str] = mapped_column(String(20), default="lime", server_default="lime")
@@ -39,6 +41,31 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class AuthChallenge(Base):
+    __tablename__ = "auth_challenges"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    purpose: Mapped[str] = mapped_column(String(40), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    browser_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    code_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    attempts: Mapped[int] = mapped_column(default=0, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EmailDeliveryQuota(Base):
+    __tablename__ = "email_delivery_quotas"
+
+    recipient_digest: Mapped[str] = mapped_column(String(64), primary_key=True)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    count: Mapped[int] = mapped_column(nullable=False, default=0)
 
 
 class SystemSetting(Base):
@@ -347,6 +374,8 @@ class ChatParticipant(Base):
     )
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    profile_revealed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    nickname: Mapped[str | None] = mapped_column(String(40), nullable=True)
     muted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -402,3 +431,27 @@ class ChatMessageReceipt(Base):
     message: Mapped["ChatMessage"] = relationship("ChatMessage", back_populates="receipts")
     user: Mapped["User"] = relationship("User")
 # End chat persistence models.
+
+
+class BrowserPushSubscription(Base):
+    __tablename__ = "browser_push_subscriptions"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    endpoint: Mapped[str] = mapped_column(Text, unique=True)
+    keys: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class BrowserPushDelivery(Base):
+    __tablename__ = "browser_push_deliveries"
+    __table_args__ = (
+        UniqueConstraint("subscription_id", "notification_id", name="uq_push_notification"),
+        UniqueConstraint("subscription_id", "message_id", name="uq_push_message"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    subscription_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("browser_push_subscriptions.id", ondelete="CASCADE"), index=True)
+    notification_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("notifications.id", ondelete="CASCADE"), nullable=True)
+    message_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("chat_messages.id", ondelete="CASCADE"), nullable=True)
+    attempts: Mapped[int] = mapped_column(default=0, server_default="0")
+    run_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -1,0 +1,24 @@
+# Copy to private deploy.conf with mode 600 and fill in values on the server.
+REPO_URL=https://github.com/naveenSaini1/fmlcore.git
+BRANCH=master
+GITHUB_USER=x-access-token
+GITHUB_TOKEN=''
+DOMAIN=fmlcore.com
+ADMIN_DOMAIN=admin.fmlcore.com
+ADMIN_EMAILS=''
+STAGING_ONLY=false
+
+GOOGLE_CLIENT_ID=''
+SMTP_HOST=''
+SMTP_PORT=587
+SMTP_USERNAME=''
+SMTP_PASSWORD=''
+SMTP_FROM_EMAIL=''
+SMTP_FROM_NAME=FMLCore
+SMTP_SECURITY=starttls
+
+GEMINI_API_KEY=''
+GEMINI_PAID_SERVICE_CONFIRMED=false
+GROQ_API_KEY=''
+# Optional VAPID contact. The deployer persists its generated key pair on disk.
+WEB_PUSH_SUBJECT=''

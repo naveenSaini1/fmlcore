@@ -1,0 +1,2 @@
+export const metadata = { title: 'Explore life stories', description: 'Find funny, embarrassing and honest stories from people who have been there.', alternates: { canonical: "/explore" }, openGraph: { title: 'Explore life stories', description: 'Find funny, embarrassing and honest stories from people who have been there.', url: "/explore" } };
+export default function Layout({ children }) { return children; }

@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, joinedload
 
+from app.chat.identity import participant_identity
 from app.chat.models import (
     ChatConversation,
     ChatMessage,
@@ -28,21 +29,7 @@ from app.websocket.manager import ws_manager
 logger = logging.getLogger(__name__)
 
 
-def user_to_participant_out(user: User, last_read_at: datetime | None = None) -> ChatParticipantOut:
-    avatar = f"/media/avatars/{user.avatar_file}" if user.avatar_file else None
-    return ChatParticipantOut(
-        user_id=user.id,
-        username=user.username,
-        avatar_url=avatar,
-        profile_color=user.profile_color or "lime",
-        profile_sticker=user.profile_sticker or "star",
-        bio=user.bio or "",
-        is_online=ws_manager.is_user_online(user.id),
-        last_read_at=last_read_at,
-    )
-
-
-def message_to_out(msg: ChatMessage, current_user_id: UUID) -> ChatMessageOut:
+def message_to_out(msg: ChatMessage, current_user_id: UUID, db: Session) -> ChatMessageOut:
     # Determine delivery/read status from receipts or sender
     receipt = msg.receipts[0] if msg.receipts else None
     delivered_at = receipt.delivered_at if receipt else None
@@ -55,11 +42,12 @@ def message_to_out(msg: ChatMessage, current_user_id: UUID) -> ChatMessageOut:
     else:
         status = "sent"
 
+    identity = participant_identity(db, msg.conversation_id, msg.sender_id, current_user_id)
     return ChatMessageOut(
         id=msg.id,
         conversation_id=msg.conversation_id,
-        sender_id=msg.sender_id,
-        sender_username=msg.sender.username if msg.sender else "",
+        sender_id=identity.user_id,
+        sender_username=identity.username,
         content=msg.content,
         message_type=msg.message_type,
         created_at=msg.created_at,
@@ -147,7 +135,7 @@ def get_user_conversations(db: Session, user_id: UUID) -> list[ChatConversationS
     for conv in conversations:
         # Find the other participant
         other_part = next((p for p in conv.participants if p.user_id != user_id), None)
-        if not other_part or not other_part.user:
+        if not other_part or not other_part.user or relationship_blocked(db, user_id, other_part.user_id):
             continue
 
         my_part = my_part_map.get(conv.id)
@@ -179,14 +167,14 @@ def get_user_conversations(db: Session, user_id: UUID) -> list[ChatConversationS
             .limit(1)
         )
 
-        last_message_out = message_to_out(latest_msg, user_id) if latest_msg else None
+        last_message_out = message_to_out(latest_msg, user_id, db) if latest_msg else None
 
         summaries.append(
             ChatConversationSummaryOut(
                 id=conv.id,
                 same_sky_match_id=conv.same_sky_match_id,
                 conversation_type=conv.conversation_type,
-                other_user=user_to_participant_out(other_part.user, other_part.last_read_at),
+                other_user=participant_identity(db, conv.id, other_part.user_id, user_id),
                 last_message=last_message_out,
                 unread_count=unread_count,
                 last_message_at=conv.last_message_at,
@@ -217,12 +205,16 @@ def get_conversation_detail(db: Session, conversation_id: UUID, user_id: UUID) -
     if not other_part or not other_part.user:
         raise HTTPException(status_code=404, detail="Other participant not found.")
 
+    if relationship_blocked(db, user_id, other_part.user_id):
+        raise HTTPException(403, "This connection is unavailable.")
+
     return ChatConversationDetailOut(
+        my_profile_revealed=bool(next(p for p in conv.participants if p.user_id == user_id).profile_revealed),
         id=conv.id,
         same_sky_match_id=conv.same_sky_match_id,
         conversation_type=conv.conversation_type,
-        participants=[user_to_participant_out(p.user, p.last_read_at) for p in conv.participants if p.user],
-        other_user=user_to_participant_out(other_part.user, other_part.last_read_at),
+        participants=[participant_identity(db, conv.id, p.user_id, user_id) for p in conv.participants if p.user],
+        other_user=participant_identity(db, conv.id, other_part.user_id, user_id),
         created_at=conv.created_at,
         last_message_at=conv.last_message_at,
     )
@@ -236,6 +228,7 @@ def get_conversation_messages(
     limit: int = 30,
 ) -> ChatMessageListOut:
     """Retrieve paginated messages for a conversation."""
+    get_conversation_detail(db, conversation_id, user_id)
     # Check participant
     part = db.scalar(
         select(ChatParticipant.id)
@@ -292,7 +285,7 @@ def get_conversation_messages(
     )
 
     return ChatMessageListOut(
-        messages=[message_to_out(m, user_id) for m in rows_chronological],
+        messages=[message_to_out(m, user_id, db) for m in rows_chronological],
         next_cursor=next_cursor,
         has_more=has_more,
     )
@@ -384,6 +377,7 @@ def mark_conversation_read(
         .where(ChatParticipant.conversation_id == conversation_id)
     ).all()
 
+    get_conversation_detail(db, conversation_id, user_id)
     my_part = next((p for p in participants if p.user_id == user_id), None)
     if not my_part:
         raise HTTPException(status_code=403, detail="You are not a participant in this conversation.")

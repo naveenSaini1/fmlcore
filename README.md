@@ -13,7 +13,8 @@ stories. Its product rule is simple: **relatability over likes and followers**.
 - JWT sessions in HTTP-only cookies, content reporting, blocking/muting, and
   per-IP limits for sensitive actions.
 - Posts, images, comments, reactions, explore, notifications, profiles,
-  dynamic themes, and a weekly leaderboard.
+  dynamic themes, and a live weekly leaderboard. Browser notifications are
+  opt-in from Notifications or Edit Profile.
 - Same Sky matching from existing posts and Confession Sky balloons. Each new
   post/confession is analyzed once after saving; “Start Matching” later compares
   the stored results. Same Sky has mutual match
@@ -21,11 +22,21 @@ stories. Its product rule is simple: **relatability over likes and followers**.
   implementation is present but still needs safety and production verification;
   see the current handoff before deploying it.
 - Skin Studio provides five complete presentation skins at
-  `/settings/appearance`, with preview and persistent account preferences.
+  `/settings/appearance` and Edit Profile, with compact circle selectors
+  for skins and color themes. Skin controls layout/fonts; theme controls colors.
+  Both preferences persist per account.
+- Signed-out visitors can open Skins & colors from the navbar (palette icon on
+  phones). Their choices apply immediately and persist on that browser.
 - Same Sky eligibility thresholds are configurable with `SAME_SKY_REQUIRED_POSTS`
   and `SAME_SKY_REQUIRED_CONFESSIONS` in backend settings.
 
 ## Fork and run locally
+
+Google sign-in, email OTP setup, account-linking rules, and reusable email code
+are documented in [Authentication](docs/AUTHENTICATION.md). Configure SMTP and a
+Google Web client ID before testing live delivery/sign-in; both are disabled
+until configured. New email/password accounts require OTP before creation.
+Password login does not ask for another code; existing accounts remain unchanged.
 
 ### Prerequisites
 
@@ -97,7 +108,8 @@ stories. Its product rule is simple: **relatability over likes and followers**.
    ```
 
    Open [http://localhost:3000](http://localhost:3000). Signed-out visitors land
-   on Explore; signed-in users have a personal space on the home page. `/me` is
+   on Explore; signed-in users have a profile-led home page with their stories
+   and an Edit profile link to `/profile` for skins and color themes. `/me` is
    the public About page with founder and platform information. API documentation is
    available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) and
    the liveness endpoint is `GET /health`.
@@ -130,10 +142,28 @@ stories. Its product rule is simple: **relatability over likes and followers**.
   billing-enabled Gemini project; see the [privacy and operations guide](docs/SAME_SKY_PRIVACY.md)
   before enabling it.
 
+## Public profiles and match identity
+
+Click a public author’s name or avatar to open `/users/{username}`. Profiles
+have Posts and Confessions tabs, showing only public, non-anonymous stories.
+Anonymous and private stories stay excluded even when viewing your own public
+profile. Emails and account settings are never part of the public profile API.
+Existing block and mute filters apply.
+
+Same Sky suggestions start with generated aliases. Chat also hides usernames,
+photos, biographies, and public account identifiers until that person chooses
+**Reveal my profile** under **Names & profile sharing**. Consent is one-sided
+and specific to that conversation. A private nickname changes only your view.
+**Stop sharing my profile** hides the profile again for future reads, but cannot
+erase what someone already saw or saved. Messages users write can still identify
+them; profile hiding does not redact message content. Existing matches default
+to anonymous when migration `20261111_0916` is applied.
+
 ## Deploying
 
 The repository includes production Dockerfiles and a self-hosted Compose
-configuration. Follow [the deployment guide](docs/DEPLOYMENT.md) before making
+configuration. Start with [the production server runbook](docs/SERVER_RUNBOOK.md) for the active
+server and follow [the deployment guide](docs/DEPLOYMENT.md) before making
 the app public. It covers HTTPS, production secrets, persistent volumes,
 backups, verification, and the current database-migration limitation.
 

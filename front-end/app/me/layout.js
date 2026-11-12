@@ -1,0 +1,2 @@
+export const metadata = { title: 'About FMLCore', description: 'Learn about FMLCore, a place to share honest life stories and feel a little less alone.', alternates: { canonical: "/me" }, openGraph: { title: 'About FMLCore', description: 'Learn about FMLCore, a place to share honest life stories and feel a little less alone.', url: "/me" } };
+export default function Layout({ children }) { return children; }

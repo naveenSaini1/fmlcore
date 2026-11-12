@@ -48,7 +48,7 @@ class WebSocketManager:
             len(self._connections_by_user[user_id]),
         )
         if was_offline:
-            await self.broadcast(
+            await self.publish_presence(
                 event=PRESENCE_ONLINE,
                 data={"user_id": str(user_id)},
                 exclude_user=user_id,
@@ -74,7 +74,7 @@ class WebSocketManager:
             len(self._connections_by_user.get(user_id, set())),
         )
         if is_now_offline:
-            await self.broadcast(
+            await self.publish_presence(
                 event=PRESENCE_OFFLINE,
                 data={"user_id": str(user_id)},
                 exclude_user=user_id,
@@ -86,11 +86,29 @@ class WebSocketManager:
             conns = list(self._connections_by_user.pop(user_id, set()))
         for conn in conns:
             await conn.close()
-        await self.broadcast(
+        await self.publish_presence(
             event=PRESENCE_OFFLINE,
             data={"user_id": str(user_id)},
             exclude_user=user_id,
         )
+
+    async def publish_presence(self, event, data, exclude_user):
+        from app.db import SessionLocal
+        from app.models import ChatParticipant
+        from app.chat.identity import participant_identity
+        from sqlalchemy import select
+        from app.safety import relationship_blocked
+        subject_id = exclude_user
+        deliveries = []
+        with SessionLocal() as db:
+            own = db.scalars(select(ChatParticipant).where(ChatParticipant.user_id == subject_id)).all()
+            for part in own:
+                for viewer in part.conversation.participants:
+                    if viewer.user_id != subject_id and not relationship_blocked(db, subject_id, viewer.user_id):
+                        identity = participant_identity(db, part.conversation_id, subject_id, viewer.user_id)
+                        deliveries.append((viewer.user_id, str(identity.user_id)))
+        for viewer_id, scoped_id in deliveries:
+            await self.send_to_user(viewer_id, event, {"user_id": scoped_id})
 
     async def send_to_user(
         self,
@@ -171,6 +189,10 @@ class WebSocketManager:
     def active_connection_count(self) -> int:
         """Return the total number of open WebSocket connections."""
         return sum(len(c) for c in self._connections_by_user.values())
+
+    def online_user_ids(self) -> set[UUID]:
+        """Snapshot users with connections on this API process."""
+        return set(self._connections_by_user)
 
     def online_user_count(self) -> int:
         """Return the number of distinct authenticated users connected."""

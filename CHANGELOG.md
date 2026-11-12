@@ -3,16 +3,69 @@
 All notable changes to FMLCore. Versions track build stages as `0.<stage>.<patch>`.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
-## [Unreleased] — 2026-11-10
+## [Unreleased] — 2026-11-12
+
+- Refresh weekly leaderboard rankings automatically after committed votes and
+  exclude private stories from public rankings.
+- Move signed-in skin and theme controls from Home to Edit Profile.
+- Add opt-in browser push for reactions, comments, matches, and chat activity.
+- Add the smiley favicon, public sitemap, crawl rules, and social share image.
+- Track the production deployer, bundled fonts, and frozen clean database
+  baseline so deployment builds the reviewed Git commit directly.
+
+- Deployed the public app/admin with custom-domain HTTPS and persistent storage;
+  added a server runbook documenting private deployment overrides and operations.
+- Added Google sign-in to the admin console while retaining the email allowlist.
+- Fixed authenticated admin overview crashing on missing `pgrep`; separate-service
+  worker status now uses its PostgreSQL listener and blocks local process controls.
+- Handle plain-text/HTML API errors in both admin views with readable messages.
+- Replaced the absolute public-image symlink with portable logo/icon files.
+
+- Added clickable public profiles with separate posts/confessions tabs; private
+  and anonymous stories are excluded at the API boundary.
+- Same Sky identities now start anonymous across match cards, chat, live events,
+  and notifications. Added private nicknames, one-sided profile sharing and
+  withdrawal per conversation, plus migration 0916 and privacy regression tests.
 
 ### Added
-- Skin Studio at `/settings/appearance`, with preview/apply/cancel, a persistent
-  account preference, guest caching, and five skins: Calm Chaos (Poppins),
+- Signed-out visitors can change skins and color themes from a navbar appearance
+  dialog. Guest choices persist locally; signed-in controls stay on home.
+- Google sign-in/signup with server-verified identity, username/18+ onboarding,
+  and email-code verification before linking an existing account.
+- Email OTP before new account creation, normal password login with no repeated
+  code or existing-account backfill, reusable SMTP messaging/templates,
+  purpose-bound hashed codes, expiry, attempt/resend limits, durable recipient
+  quotas, and case-insensitive username availability feedback. Includes admin
+  OTP login, migration 0913, integration tests, and setup documentation.
+- Redesigned the weekly leaderboard panel with compact ranked rows, quiet vote
+  counts, two-line excerpts, and links to each entry in the full leaderboard.
+- Tightened shared post cards: inline author/time, text aligned beneath the
+  author, one compact category/mood row, and smaller gaps before actions.
+- Removed technical analysis/provider explanations from post and confession
+  composers. Same Sky readiness now uses short, user-facing status messages.
+- Signed-in home combines a photo-led profile header, owned stories, compact skin
+  circles, and an Edit profile link to the existing profile page. Drafts survive
+  skin changes; each skin gives the hub a different composition.
+- Skin Studio at `/settings/appearance`, with one-click circular selectors, a persistent
+  account preference, guest caching, and five skins: Calm Chaos (original styling),
   Social Classic, After Hours, Frappe, and the original Common Ground design.
 - Shared skin treatments for navigation, typography, story cards, forms,
   profiles, discovery, chat, and Confession Sky controls. Editorial and Digital
   Nostalgia were removed; legacy selections fall back to Calm Chaos.
+- Restored Calm Chaos to the pre-Skin-Studio appearance: Syne/Outfit/Caveat
+  typography, dotted paper, squared controls, bold borders, hard offset shadows,
+  and lightly tilted story cards. Current home features, palettes, and mobile
+  bottom navigation remain available.
 - Leaderboard navigation for guests and signed-in users.
+- Profile and Skin links removed from the navbar; both controls are available
+  on the signed-in home page.
+- Mobile navigation uses a fixed five-icon bottom bar with active states,
+  unread badges, safe-area padding, and reserved content space. A compact brand
+  header retains notifications and leaderboard (or guest sign-in controls).
+- Moved color themes from the navbar into Skin Studio as compact circles.
+  Shared palette tokens now control backgrounds, text, borders, controls, and
+  cards across every skin, independently of layout and fonts. Theme saves roll
+  back on failure; System follows the device light/dark preference.
 - In-progress Stage 9-2 chat and WebSocket modules, conversation/message/receipt
   persistence, chat UI, and Same Sky connection integration. Chat still needs
   the authorization, safety, and production-transport follow-ups documented in
@@ -20,7 +73,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Operations
 - Run `alembic upgrade head` before using this snapshot; the migration head is
-  `20261110_0912` (chat tables followed by the user skin preference).
+  `20261110_0913` (chat, skin preference, then verified email/Google auth).
 - Use `NEXT_BUILD_DIR=.next-verify npm run build` for local verification to
   avoid overwriting a running development server's generated manifests.
 - Chat auto-scroll now scrolls the message pane without moving the page header.

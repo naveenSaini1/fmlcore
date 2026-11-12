@@ -1,18 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import PersonalSpace from "./components/PersonalSpace";
+import HomeDashboard from "./components/HomeDashboard";
 import Explore from "./components/Explore";
-import { getMe } from "../lib/api";
+import { useSession } from "../lib/session";
 
 export default function HomePage() {
-  const [user, setUser] = useState(null);
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    getMe().then(setUser).catch(() => setUser(null)).finally(() => setReady(true));
-  }, []);
+  const { user, ready } = useSession();
 
   return <>
-    {!ready ? <main className="px-4 py-16 font-bold">Checking the door…</main> : user ? <PersonalSpace user={user} /> : <Explore user={null} />}
+    {!ready ? <main className="px-4 py-16 font-bold">Checking the door…</main> : user ? <HomeDashboard user={user} /> : <Explore user={null} />}
   </>;
 }

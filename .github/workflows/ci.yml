@@ -21,6 +21,7 @@ jobs:
           cache: npm
           cache-dependency-path: front-end/package-lock.json
       - run: npm ci
+      - run: npm test
       - run: npm run build
 
   backend:
@@ -38,3 +39,37 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r requirements.txt
       - run: python -m compileall -q app
+
+  auth-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: fmlcore
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: fmlcore_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fmlcore -d fmlcore_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://fmlcore:test-password@localhost:5432/fmlcore_test
+      APP_ENV: test
+      JWT_SECRET: integration-tests-only-not-a-production-secret
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - run: alembic upgrade head
+      - run: python -m unittest discover -s tests -v

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { readApiResponse } from "./lib/api-response.mjs";
+import GoogleSigninButton from "./components/GoogleSigninButton";
 
 async function api(path, options = {}) {
   const response = await fetch(`/api${path}`, {
@@ -9,10 +11,7 @@ async function api(path, options = {}) {
     credentials: "include",
     headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...(options.headers || {}) },
   });
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!response.ok) throw new Error(data?.detail || "Something went wrong. Try again.");
-  return data;
+  return readApiResponse(response);
 }
 
 function dateLabel(value) {
@@ -28,6 +27,19 @@ export default function AdminPage() {
   const [admin, setAdmin] = useState(null);
   const [checking, setChecking] = useState(true);
   const [loginError, setLoginError] = useState("");
+  const [authOptions, setAuthOptions] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    api("/auth/options").then(result => { if (alive) setAuthOptions(result); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const [loginFlow, setLoginFlow] = useState(null);
+  const [resendWait, setResendWait] = useState(0);
+  useEffect(() => {
+    if (!resendWait) return;
+    const timer = setTimeout(() => setResendWait(value => Math.max(0, value - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [resendWait]);
   const [busy, setBusy] = useState(false);
   const [overview, setOverview] = useState(null);
   const [users, setUsers] = useState([]);
@@ -72,9 +84,38 @@ export default function AdminPage() {
     setLoginError("");
     const form = new FormData(event.currentTarget);
     try {
-      await api("/auth/login", { method: "POST", body: JSON.stringify({ email: form.get("email"), password: form.get("password") }) });
+      const result = loginFlow
+        ? await api("/auth/email/verify", { method: "POST", body: JSON.stringify({ challenge_id: loginFlow.challenge_id, code: form.get("code") }) })
+        : await api("/auth/login", { method: "POST", body: JSON.stringify({ email: form.get("email"), password: form.get("password") }) });
+      if (result.requires_verification) { setLoginFlow(result); setResendWait(result.resend_after); return; }
       const identity = await api("/admin/me");
       setAdmin(identity);
+      setLoginFlow(null);
+      await loadDashboard(1, "");
+    } catch (error) {
+      try { await api("/auth/logout", { method: "POST" }); } catch {}
+      setLoginError(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function googleSignIn(result) {
+    setBusy(true);
+    setLoginError("");
+    try {
+      if (result.requires_verification) {
+        setLoginFlow(result);
+        setResendWait(result.resend_after || 0);
+        return;
+      }
+      if (result.requires_username) {
+        throw new Error("Create your FMLCore profile on fmlcore.com first, then return here to sign in.");
+      }
+      // Google authenticates the account; the backend still checks the admin allowlist.
+      const identity = await api("/admin/me");
+      setAdmin(identity);
+      setLoginFlow(null);
       await loadDashboard(1, "");
     } catch (error) {
       try { await api("/auth/logout", { method: "POST" }); } catch {}
@@ -166,8 +207,24 @@ export default function AdminPage() {
           <form className="card login-card" onSubmit={signIn}>
             <p className="eyebrow">welcome back</p>
             <h2 style={{ marginBottom: 22 }}>Log in to FMLCore</h2>
-            <label className="field">Email<input name="email" type="email" autoComplete="username" required /></label>
-            <label className="field">Password<input name="password" type="password" autoComplete="current-password" required /></label>
+            {loginFlow ? <>
+              <p>Enter the code sent to {loginFlow.email_hint}.</p>
+              <label className="field">Verification code<input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} autoFocus required /></label>
+              <button type="button" className="btn" disabled={busy || resendWait > 0} onClick={async () => {
+                setBusy(true); setLoginError("");
+                try { const result = await api("/auth/email/resend", { method: "POST", body: JSON.stringify({ challenge_id: loginFlow.challenge_id }) }); setResendWait(result.resend_after); }
+                catch (error) { setLoginError(error.message); }
+                finally { setBusy(false); }
+              }}>{resendWait ? `Resend in ${resendWait}s` : "Resend code"}</button>
+              <button type="button" className="btn" disabled={busy} onClick={() => { setLoginFlow(null); setLoginError(""); }}>Start again</button>
+            </> : <>
+              {authOptions?.google_enabled && <>
+                <GoogleSigninButton api={api} onResult={googleSignIn} onError={setLoginError} disabled={busy} />
+                <p className="note" style={{ marginBottom: 16 }}>or sign in with your email and password</p>
+              </>}
+              <label className="field">Email<input name="email" type="email" autoComplete="username" required /></label>
+              <label className="field">Password<input name="password" type="password" autoComplete="current-password" required /></label>
+            </>}
             {loginError && <p className="error" role="alert">{loginError}</p>}
             <button className="btn" style={{ width: "100%", marginTop: 8 }} disabled={busy}>{busy ? "Checking access…" : "Enter admin panel"}</button>
           </form>
@@ -231,17 +288,17 @@ export default function AdminPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <p className="eyebrow" style={{ margin: 0 }}>Background Worker</p>
               <span className={`pill ${overview?.worker_status?.running ? "" : "pill-off"}`}>
-                {overview?.worker_status?.running ? `● RUNNING (${overview.worker_status.pids.join(", ")})` : "○ STOPPED"}
+                {overview?.worker_status?.running ? (overview.worker_status.managed_externally ? "● RUNNING" : `● RUNNING (${overview.worker_status.pids.join(", ")})`) : "○ STOPPED"}
               </span>
             </div>
             <p className="panel-subtitle" style={{ fontSize: "0.82rem", marginBottom: 12 }}>
-              Event-driven via PostgreSQL LISTEN/NOTIFY. When OFF, the worker process is killed: 0 CPU, 0 database queries.
+              {overview?.worker_status?.managed_externally ? "Managed by the server as a separate service." : "Event-driven via PostgreSQL LISTEN/NOTIFY. Start or stop the local worker here."}
             </p>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: workerActionNote ? 8 : 0 }}>
               <button
                 type="button"
                 className={`btn ${overview?.worker_status?.running ? "btn-coral" : ""}`}
-                disabled={busy}
+                disabled={busy || overview?.worker_status?.managed_externally}
                 onClick={toggleWorker}
               >
                 {overview?.worker_status?.running ? "Turn OFF (Kill)" : "Turn ON (Start)"}

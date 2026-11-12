@@ -27,6 +27,20 @@ same FMLCore visual theme and runs on port `3001` in development.
 5. Open `http://localhost:3001` and sign in using the existing FMLCore account
    whose email is on the allowlist.
 
+## Google sign-in
+
+When `GOOGLE_CLIENT_ID` is configured, the admin login also offers Continue with
+Google. Use the same Google account used to create the existing FMLCore profile;
+Google-only accounts do not need a password. Add the exact admin origin (for
+example, `https://admin.fmlcore.com`) to the Web client's Authorized JavaScript
+origins in Google Auth Platform, and include it in backend `CORS_ORIGINS`.
+This uses the Google Identity Services popup callback, without a redirect URI.
+
+The console checks `/admin/me` after authentication. The backend still checks
+`ADMIN_EMAILS` on every admin endpoint; Google sign-in never grants admin access
+by itself. Email verification/account-linking challenges use the existing code
+entry flow. New Google accounts must create their profile on the public app first.
+
 ## Dashboard data
 
 - Overview totals include accounts, accounts with a recorded sign-in, sign-ins
@@ -65,3 +79,11 @@ Set `ADMIN_EMAILS` and include the admin HTTPS origin in `CORS_ORIGINS`. The
 production Compose service binds to `127.0.0.1:3001`; expose it through the
 operator's HTTPS reverse proxy only when needed. Keep the backend API and
 database private. Apply migrations before switching traffic to a new release.
+
+## Production worker status and API failures
+
+For a separate worker container, set `SAME_SKY_WORKER_MANAGED=true` in API and
+worker environments. Status uses the worker's named PostgreSQL listener, not API
+container PIDs. The console disables process start/stop in this mode; operators
+use Compose to manage the service. See [SERVER_RUNBOOK.md](SERVER_RUNBOOK.md)
+for the deployment, checks, and the repaired overview/JSON parser failure.

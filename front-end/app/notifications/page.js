@@ -1,8 +1,11 @@
 "use client";
 
+import BrowserNotifications from "../components/BrowserNotifications";
+
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getMe, getNotifications, markAllNotificationsRead, markNotificationRead } from "../../lib/api";
+import { useEffect, useRef, useState } from "react";
+import { getNotifications, markAllNotificationsRead, markNotificationRead } from "../../lib/api";
+import { useSession } from "../../lib/session";
 import { timeAgo } from "../../lib/format";
 
 function notificationCopy(item) {
@@ -17,40 +20,51 @@ function notificationCopy(item) {
 }
 
 export default function NotificationsPage() {
-  const [user, setUser] = useState(null);
+  const { user, ready } = useSession();
   const [items, setItems] = useState([]);
   const [cursor, setCursor] = useState(null);
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
+  const loadRevision = useRef(0);
+
   async function load(cursorValue = null, append = false) {
+    const revision = ++loadRevision.current;
     setError("");
     try {
       const data = await getNotifications(cursorValue);
-      setItems((current) => append ? [...current, ...data.notifications] : data.notifications);
+      if (revision !== loadRevision.current) return;
+      setItems((current) => append ? [...new Map([...current, ...data.notifications].map((item) => [item.id, item])).values()] : data.notifications);
       setCursor(data.next_cursor);
       setStatus("ready");
     } catch (err) {
+      if (revision !== loadRevision.current) return;
       setError(err.message);
       setStatus("error");
     }
   }
 
   useEffect(() => {
-    getMe().then((me) => {
-      setUser(me);
-      load();
-    }).catch(() => {
-      window.location.replace("/login");
-    });
-  }, []);
+    if (ready && !user) window.location.replace("/login");
+  }, [ready, user]);
+
+  useEffect(() => {
+    if (!ready || !user) return undefined;
+    const refresh = () => load();
+    window.addEventListener("fmlcore:notifications-change", refresh);
+    // Covers events delivered while the initial auth request was in flight.
+    refresh();
+    return () => {
+      loadRevision.current += 1;
+      window.removeEventListener("fmlcore:notifications-change", refresh);
+    };
+  }, [ready, user?.id]);
 
   async function markOne(id) {
     try {
       await markNotificationRead(id);
       setItems((current) => current.map((item) => item.id === id ? { ...item, is_read: true } : item));
-      window.dispatchEvent(new Event("fmlcore:notifications-change"));
     } catch (err) {
       setError(err.message);
     }
@@ -61,8 +75,8 @@ export default function NotificationsPage() {
     setError("");
     try {
       await markAllNotificationsRead();
-      setItems((current) => current.map((item) => ({ ...item, is_read: true })));
-      window.dispatchEvent(new Event("fmlcore:notifications-change"));
+      // A new notification can arrive while the read-all request is in flight.
+      await load();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -82,6 +96,7 @@ export default function NotificationsPage() {
             {pending ? "Saving…" : "Mark all read"}
           </button>
         </header>
+        <BrowserNotifications />
         {error ? <p className="mb-4 border-4 border-ink bg-coral p-3 font-bold text-on-brand" role="alert">{error}</p> : null}
         {status === "loading" ? <p className="font-note text-2xl">Checking in…</p> : null}
         {status === "ready" && items.length === 0 ? (

@@ -8,7 +8,9 @@ export const WS_EVENTS = {
   AUTH_SUCCESS: "auth.success",
   AUTH_ERROR: "auth.error",
 
+  CHAT_IDENTITY_CHANGED: "chat.identity.changed",
   CHAT_MESSAGE: "chat.message",
+  CHAT_UNREAD_COUNT: "chat.unread_count",
   CHAT_MESSAGE_SEND: "chat.message.send",
   CHAT_MESSAGE_SENT: "chat.message.sent",
   CHAT_MESSAGE_DELIVERED: "chat.message.delivered",
@@ -22,6 +24,7 @@ export const WS_EVENTS = {
   PRESENCE_STATUS: "presence.status",
 
   NOTIFICATION_NEW: "notification.new",
+  NOTIFICATION_CHANGED: "notification.changed",
   SAME_SKY_MATCH_ACCEPTED: "same_sky.match.accepted",
   SAME_SKY_CONNECTION_CREATED: "same_sky.connection.created",
 };

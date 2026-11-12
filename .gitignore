@@ -11,3 +11,6 @@ __pycache__/
 uploads/
 .DS_Store
 *.log
+
+# Operator credentials for the production deployer
+scripts/deploy.conf

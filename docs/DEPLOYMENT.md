@@ -1,5 +1,10 @@
 # Deployment guide
 
+For the server actually running at `fmlcore.com` and `admin.fmlcore.com`, start
+with [the production server runbook](SERVER_RUNBOOK.md). It documents the GitHub deployer, private configuration, storage, update commands,
+and known limits.
+The generic Compose example below differs from that active configuration.
+
 This guide describes the supplied self-hosted Docker deployment. It publishes
 the Next.js app on port 3000 and the separate owner-only admin console on
 127.0.0.1:3001; put a TLS-terminating reverse proxy such as Caddy or Nginx in
@@ -11,9 +16,9 @@ front of the domains you intend to expose.
 - A DNS name and HTTPS reverse proxy for the public app.
 - Durable storage for PostgreSQL and uploaded media.
 - PostgreSQL 16 with the pgvector extension available.
-- A billing-enabled Gemini API project and a Groq API key for Same Sky. The
-  worker remains idle until both providers are configured and Gemini billing
-  is confirmed.
+- A billing-enabled Gemini API project for Same Sky embeddings and its default
+  analysis provider. Groq is an optional alternative analysis provider. Gemini
+  readiness requires its API key and explicit billing confirmation.
 - A backup location that is separate from the application host.
 
 ## Configure secrets
@@ -40,9 +45,9 @@ by Git. The admin app uses normal account login, then the backend checks this
 allowlist on every admin request.
 
 For Same Sky, configure `GEMINI_API_KEY` from a project with Cloud Billing
-active, then set `GEMINI_PAID_SERVICE_CONFIRMED=true`; also configure
-`GROQ_API_KEY`. Both models analyze opted-in posts, and Gemini creates the
-embeddings. Unpaid Gemini API content may be used to improve Google's products;
+active, then set `GEMINI_PAID_SERVICE_CONFIRMED=true`; configure
+`GROQ_API_KEY` if Groq will be selected for analysis. The selected provider
+analyzes opted-in posts, and Gemini creates the embeddings. Unpaid Gemini API content may be used to improve Google's products;
 paid-service prompts and responses are not used for product improvement under
 Google's current terms. Groq's inference retention controls are described in
 its [data guide](https://console.groq.com/docs/your-data). The Gemini flag is
@@ -110,6 +115,10 @@ verification steps above. To roll back code, redeploy the last known-good
 revision; only restore a database backup when the data change requires it.
 
 ## Database migrations
+
+The historical 0901 migration now contains a frozen baseline for an empty
+database. Existing installations with versioned schemas apply pending revisions.
+Use the [runbook](SERVER_RUNBOOK.md) for the production workflow.
 
 Alembic tracks schema changes. The API image runs `alembic upgrade head` before
 starting Uvicorn. The first migration bootstraps missing legacy tables,

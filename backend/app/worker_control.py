@@ -6,21 +6,35 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
+from fastapi import HTTPException
+from app.config import settings
 from app.db import SessionLocal
 from app.models import SameSkyJob
 
 
 def get_worker_status() -> dict:
-    try:
-        out = subprocess.check_output(["pgrep", "-f", "app\\.same_sky_worker"]).decode().strip()
-        pids = [int(p) for p in out.splitlines() if int(p) != os.getpid()]
-        running = bool(pids)
-    except subprocess.CalledProcessError:
-        running = False
-        pids = []
+    pids = []
+    running = False
+    if not settings.same_sky_worker_managed:
+        try:
+            out = subprocess.check_output(["pgrep", "-f", r"app\.same_sky_worker"]).decode().strip()
+            pids = [int(p) for p in out.splitlines() if int(p) != os.getpid()]
+            running = bool(pids)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
 
     with SessionLocal() as db:
+        if settings.same_sky_worker_managed:
+            # Container PIDs are isolated. The dedicated LISTEN connection is
+            # visible across containers and disappears when its worker exits.
+            running = bool(db.scalar(text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_stat_activity
+                    WHERE datname = current_database()
+                    AND application_name = 'fmlcore-same-sky-worker'
+                )
+            """)))
         now = datetime.now(timezone.utc)
         queued_count = db.scalar(
             select(func.count(SameSkyJob.id)).where(SameSkyJob.status == "queued")
@@ -38,6 +52,7 @@ def get_worker_status() -> dict:
     return {
         "running": running,
         "pids": pids,
+        "managed_externally": settings.same_sky_worker_managed,
         "queued_jobs": queued_count,
         "processing_jobs": processing_count,
         "failed_jobs": failed_count,
@@ -46,6 +61,8 @@ def get_worker_status() -> dict:
 
 
 def start_worker() -> dict:
+    if settings.same_sky_worker_managed:
+        raise HTTPException(status_code=409, detail="This worker is managed by the server. Use Docker Compose to start or stop it.")
     status = get_worker_status()
     if status["running"]:
         return {"ok": True, "action": "already_running", "pids": status["pids"]}
@@ -64,6 +81,8 @@ def start_worker() -> dict:
 
 
 def stop_worker() -> dict:
+    if settings.same_sky_worker_managed:
+        raise HTTPException(status_code=409, detail="This worker is managed by the server. Use Docker Compose to start or stop it.")
     status = get_worker_status()
     if not status["running"]:
         return {"ok": True, "action": "already_stopped", "pids": []}

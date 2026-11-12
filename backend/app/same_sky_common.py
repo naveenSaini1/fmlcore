@@ -106,18 +106,23 @@ def update_eligibility(
     return exp_total, conf_total, exp_ready, conf_ready, pending, int(enough)
 
 
-def _match_out(match: SameSkyMatch, user: User, other_user: User, conversation_id: uuid.UUID | None = None) -> SameSkyMatchOut:
+def _match_out(match: SameSkyMatch, user: User, other_user: User, conversation_id: uuid.UUID | None = None, db: Session | None = None) -> SameSkyMatchOut:
+    from app.chat.identity import anonymous_id, anonymous_name
     is_a = match.user_a_id == user.id
+    identity = None
+    if conversation_id and db is not None:
+        from app.chat.identity import participant_identity
+        identity = participant_identity(db, conversation_id, other_user.id, user.id)
     return SameSkyMatchOut(
         id=match.id,
         status=match.status,
         person=SameSkyPublicPersonOut(
-            id=other_user.id,
-            username=other_user.username,
-            bio=other_user.bio,
-            profile_color=other_user.profile_color,
-            profile_sticker=other_user.profile_sticker,
-            avatar_url=f"/media/avatars/{other_user.avatar_file}" if other_user.avatar_file else None,
+            id=anonymous_id(match.id, other_user.id),
+            username=identity.username if identity else anonymous_name(match.id, other_user.id),
+            bio=identity.bio if identity else "",
+            profile_color=identity.profile_color if identity else "lime",
+            profile_sticker=identity.profile_sticker if identity else "star",
+            avatar_url=identity.avatar_url if identity else None,
         ),
         shared_themes=match.shared_themes or [],
         safe_explanation=match.safe_explanation,
@@ -189,7 +194,7 @@ def profile_response(db: Session, user: User) -> SameSkyProfileOut:
             continue
         other_user = people.get(other_id)
         if other_user is not None:
-            result_matches.append(_match_out(match, user, other_user, conv_map.get(match.id)))
+            result_matches.append(_match_out(match, user, other_user, conv_map.get(match.id), db))
     result_declined_matches = []
     for match in declined_matches:
         other_id = match.user_b_id if match.user_a_id == user.id else match.user_a_id

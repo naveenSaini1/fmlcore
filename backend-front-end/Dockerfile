@@ -10,11 +10,15 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV API_ORIGIN=$API_ORIGIN
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
+RUN mkdir -p public
 RUN npm run build
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 API_ORIGIN=http://api:8000
-COPY --from=build /app ./
+COPY --from=build /app/.next/standalone ./
+COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
 EXPOSE 3001
-CMD ["npm", "run", "start"]
+ENV HOSTNAME=0.0.0.0 PORT=3001
+CMD ["node", "server.js"]

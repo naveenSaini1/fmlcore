@@ -4,6 +4,10 @@ from pydantic import BaseModel, Field
 
 
 class ChatParticipantOut(BaseModel):
+    alias: str = ""
+    nickname: str | None = None
+    is_revealed: bool = False
+    profile_username: str | None = None
     user_id: uuid.UUID
     username: str
     avatar_url: str | None = None
@@ -38,7 +42,13 @@ class ChatConversationSummaryOut(BaseModel):
     created_at: datetime
 
 
+class ChatIdentityIn(BaseModel):
+    nickname: str | None = Field(default=None, max_length=40)
+    profile_revealed: bool | None = None
+
+
 class ChatConversationDetailOut(BaseModel):
+    my_profile_revealed: bool = False
     id: uuid.UUID
     same_sky_match_id: uuid.UUID | None = None
     conversation_type: str = "same_sky"

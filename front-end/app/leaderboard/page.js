@@ -1,45 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useSession } from "../../lib/session";
 import PostCard from "../components/PostCard";
-import { getLeaderboard, getMe } from "../../lib/api";
+import { useLiveLeaderboard } from "../../lib/useLiveLeaderboard";
 
 export default function LeaderboardPage() {
-  const [user, setUser] = useState(null);
-  const [entries, setEntries] = useState([]);
-  const [nextOffset, setNextOffset] = useState(null);
-  const [status, setStatus] = useState("loading");
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    getMe().then(setUser).catch(() => setUser(null));
-    getLeaderboard({ limit: 5 })
-      .then((data) => {
-        setEntries(data.entries);
-        setNextOffset(data.next_offset);
-        setStatus("ready");
-      })
-      .catch((err) => {
-        setError(err.message);
-        setStatus("error");
-      });
-  }, []);
-
-  async function loadMore() {
-    if (nextOffset === null || loadingMore) return;
-    setLoadingMore(true);
-    setError("");
-    try {
-      const data = await getLeaderboard({ limit: 5, offset: nextOffset });
-      setEntries((current) => [...current, ...data.entries]);
-      setNextOffset(data.next_offset);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+  const { user } = useSession();
+  const [limit, setLimit] = useState(5);
+  const { entries, nextOffset, loading, error } = useLiveLeaderboard(limit);
+  const status = loading ? "loading" : "ready";
 
   return (
     <>
@@ -60,7 +30,7 @@ export default function LeaderboardPage() {
         ) : null}
         <div className="space-y-7">
           {entries.map((entry, index) => (
-            <section key={entry.post.id} className="space-y-3">
+            <section key={entry.post.id} id={`leaderboard-post-${entry.post.id}`} className="scroll-mt-24 space-y-3">
               <div className="flex items-center justify-between border-4 border-ink bg-lime px-4 py-2 shadow-[4px_4px_0_var(--color-shadow)]">
                 <h2 className="font-display text-xl font-extrabold">#{entry.rank} this week</h2>
                 <span className="font-extrabold">{entry.weekly_votes} {entry.weekly_votes === 1 ? "vote" : "votes"}</span>
@@ -70,8 +40,8 @@ export default function LeaderboardPage() {
           ))}
         </div>
         {nextOffset !== null ? (
-          <button type="button" onClick={loadMore} disabled={loadingMore} className="mt-7 w-full border-4 border-ink bg-white px-4 py-3 font-extrabold shadow-[4px_4px_0_var(--color-shadow)] disabled:opacity-60">
-            {loadingMore ? "Loading…" : "Load more"}
+          <button type="button" onClick={() => setLimit(value => value + 5)} disabled={loading} className="mt-7 w-full border-4 border-ink bg-white px-4 py-3 font-extrabold shadow-[4px_4px_0_var(--color-shadow)] disabled:opacity-60">
+            {loading ? "Loading…" : "Load more"}
           </button>
         ) : null}
       </main>

@@ -1,11 +1,12 @@
-import { Outfit, Syne } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const syne = Syne({ subsets: ["latin"], variable: "--font-syne", weight: ["600", "700", "800"] });
-const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit", weight: ["400", "500", "600", "700", "800"] });
+const syne = localFont({ src: "./fonts/syne.woff2", variable: "--font-syne", weight: "400 800", display: "swap" });
+const outfit = localFont({ src: "./fonts/outfit.woff2", variable: "--font-outfit", weight: "100 900", display: "swap" });
 
 export const metadata = {
   title: "FMLCore Admin",
+  robots: { index: false, follow: false },
   description: "FMLCore operations console",
 };
 

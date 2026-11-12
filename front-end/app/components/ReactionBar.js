@@ -19,6 +19,7 @@ export default function ReactionBar({ post, onChange }) {
     try {
       const updated = key === mine ? await removeReaction(post.id) : await setReaction(post.id, key);
       onChange(updated);
+      window.dispatchEvent(new Event("fmlcore:leaderboard-change"));
       setOpen(false);
     } catch (err) {
       setError(err.message);

@@ -18,118 +18,6 @@
   --font-note: var(--font-caveat), cursive;
 }
 
-html[data-theme="acid-lime"] {
-  color-scheme: light;
-  --color-lime: #c5ff41;
-  --color-purple: #a875ff;
-  --color-coral: #ff5c4d;
-  --color-paper: #f4f1e8;
-  --color-white: #fffefa;
-  --color-ink: #171717;
-  --color-soft-purple: #ede5ff;
-  --color-soft-coral: #ffe4df;
-  --color-on-brand: #171717;
-  --color-on-ink: #c5ff41;
-  --color-danger: #a21f18;
-  --color-shadow: #171717;
-}
-
-html[data-theme="electric-purple"] {
-  color-scheme: light;
-  --color-lime: #caff55;
-  --color-purple: #8b5cf6;
-  --color-coral: #f56565;
-  --color-paper: #f5f0ff;
-  --color-white: #fffdff;
-  --color-ink: #241638;
-  --color-soft-purple: #e9ddff;
-  --color-soft-coral: #ffe3e0;
-  --color-on-brand: #080613;
-  --color-on-ink: #fffaff;
-  --color-danger: #a21f18;
-  --color-shadow: #241638;
-}
-
-html[data-theme="chaos-coral"] {
-  color-scheme: light;
-  --color-lime: #c6ee57;
-  --color-purple: #9871e8;
-  --color-coral: #f04f42;
-  --color-paper: #fff0ed;
-  --color-white: #fffdfc;
-  --color-ink: #321612;
-  --color-soft-purple: #eee6ff;
-  --color-soft-coral: #ffddd7;
-  --color-on-brand: #171717;
-  --color-on-ink: #fff8f6;
-  --color-danger: #8f2018;
-  --color-shadow: #321612;
-}
-
-html[data-theme="midnight"] {
-  color-scheme: dark;
-  --color-lime: #d6ff6b;
-  --color-purple: #bd9bff;
-  --color-coral: #ff887c;
-  --color-paper: #111321;
-  --color-white: #1b1f2e;
-  --color-ink: #f4f0ff;
-  --color-soft-purple: #29263b;
-  --color-soft-coral: #39252b;
-  --color-on-brand: #171522;
-  --color-on-ink: #171522;
-  --color-danger: #ff9d94;
-  --color-shadow: #05060c;
-}
-
-html[data-theme="classic-paper"] {
-  color-scheme: light;
-  --color-lime: #c5ff41;
-  --color-purple: #a875ff;
-  --color-coral: #ff5c4d;
-  --color-paper: #f5f0e8;
-  --color-white: #ffffff;
-  --color-ink: #171717;
-  --color-soft-purple: #ede5ff;
-  --color-soft-coral: #ffe4df;
-  --color-on-brand: #171717;
-  --color-on-ink: #c5ff41;
-  --color-danger: #a21f18;
-  --color-shadow: #171717;
-}
-
-html[data-theme="system"] {
-  color-scheme: light dark;
-  --color-lime: #c5ff41;
-  --color-purple: #a875ff;
-  --color-coral: #ff5c4d;
-  --color-paper: #f5f0e8;
-  --color-white: #ffffff;
-  --color-ink: #171717;
-  --color-soft-purple: #ede5ff;
-  --color-soft-coral: #ffe4df;
-  --color-on-brand: #171717;
-  --color-on-ink: #c5ff41;
-  --color-danger: #a21f18;
-  --color-shadow: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  html[data-theme="system"] {
-    --color-lime: #d6ff6b;
-    --color-purple: #bd9bff;
-    --color-coral: #ff887c;
-    --color-paper: #111321;
-    --color-white: #1b1f2e;
-    --color-ink: #f4f0ff;
-    --color-soft-purple: #29263b;
-    --color-soft-coral: #39252b;
-    --color-on-brand: #171522;
-    --color-on-ink: #171522;
-    --color-danger: #ff9d94;
-    --color-shadow: #05060c;
-  }
-}
 
 html {
   background: var(--color-paper);
@@ -179,12 +67,12 @@ body::before {
 /* Skin Studio: component classes keep feature code shared while the selected
    skin changes the shell, typography, surfaces, and layout treatment. */
 html[data-skin="calm"] {
-  --skin-radius: 1rem;
-  --skin-border: 2px;
-  --skin-shadow: 3px 3px 0 var(--color-shadow);
-  --font-display: var(--font-syne), sans-serif;
-  --font-body: var(--font-outfit), sans-serif;
-  --font-note: var(--font-caveat), cursive;
+  --skin-radius: 0;
+  --skin-border: 4px;
+  --skin-shadow: 4px 4px 0 var(--color-shadow);
+  --font-display: var(--font-inter), Arial, sans-serif;
+  --font-body: var(--font-inter), Arial, sans-serif;
+  --font-note: var(--font-inter), Arial, sans-serif;
 }
 
 html[data-skin="social"] {
@@ -204,8 +92,7 @@ html[data-skin="social"] {
   --font-note: Arial, Helvetica, sans-serif;
 }
 
-html[data-skin="after-hours"] {
-  color-scheme: dark;
+html[data-skin="after-hours"] {;
   --color-paper: #171717;
   --color-white: #242424;
   --color-ink: #f8f6ff;
@@ -236,12 +123,6 @@ html[data-skin="after-hours"] :where(.border-2, .border-4) { border-color: rgb(2
 
 /* Shared cards get a different reading rhythm in each skin. The data attribute
    comes from PostCard, so the feed data and interaction components stay shared. */
-html[data-skin="calm"] .post-card { border-radius: 1rem; }
-html[data-skin="calm"] .post-card--0 { transform: rotate(-.35deg); }
-html[data-skin="calm"] .post-card--1 { margin-top: .45rem; transform: translateX(.45rem) rotate(.25deg); }
-html[data-skin="calm"] .post-card--2 { transform: translateX(-.35rem) rotate(-.2deg); }
-html[data-skin="calm"] .post-card--3 { margin-top: .7rem; transform: rotate(.35deg); }
-
 html[data-skin="social"] .post-card { border-width: 1px; border-radius: .75rem; box-shadow: 0 2px 7px rgb(32 33 36 / .1); }
 html[data-skin="social"] .post-card--0, html[data-skin="social"] .post-card--1, html[data-skin="social"] .post-card--2, html[data-skin="social"] .post-card--3 { margin-top: 0; transform: none; }
 
@@ -480,8 +361,7 @@ a:active {
 @keyframes loader-sweep { to { transform: translateX(3.25rem); } }
 
 /* Frappe workspace skin. The same React tree stays mounted during switching. */
-html[data-skin="frappe"] {
-  color-scheme: light;
+html[data-skin="frappe"] {;
   --color-paper: #f8f8f8;
   --color-white: #fff;
   --color-ink: #171717;
@@ -505,49 +385,49 @@ html[data-skin="frappe"] body { font-family: var(--font-inter), Arial, sans-seri
 html[data-skin="frappe"] body::before { display: none; }
 html[data-skin="frappe"] :is(.font-display, .font-note) { font-family: var(--font-inter), Arial, sans-serif; letter-spacing: -.015em; }
 html[data-skin="frappe"] :is(.font-extrabold, .font-bold) { font-weight: 600; }
-html[data-skin="frappe"] :is(.border-ink, .border-ink\/40) { border-color: #e5e7eb; }
+html[data-skin="frappe"] :is(.border-ink, .border-ink\/40) { border-color: var(--theme-border); }
 html[data-skin="frappe"] :is(.border-2, .border-4) { border-width: 1px; }
-html[data-skin="frappe"] :is(.bg-purple, .bg-coral, .bg-soft-purple, .bg-soft-coral) { color: #252525; }
-html[data-skin="frappe"] .bg-lime { color: #fff; }
+html[data-skin="frappe"] :is(.bg-purple, .bg-coral, .bg-soft-purple, .bg-soft-coral) { color: var(--color-ink); }
+html[data-skin="frappe"] .bg-lime { color: var(--color-on-brand); }
 html[data-skin="frappe"] [class*="shadow-"] { box-shadow: var(--skin-shadow); }
 html[data-skin="frappe"] :is(button, input, select, textarea) { font-family: var(--font-inter), Arial, sans-serif; font-size: 14px; border-radius: 6px; }
-html[data-skin="frappe"] :is(input, textarea, select) { background-color: #f3f3f3; color: #171717; border-color: #e5e7eb; }
-html[data-skin="frappe"] :is(input, textarea, select):focus-visible { background-color: #fff; outline-color: #8794a5; outline-width: 2px; }
+html[data-skin="frappe"] :is(input, textarea, select) { background-color: var(--theme-tint); color: var(--color-ink); border-color: var(--theme-border); }
+html[data-skin="frappe"] :is(input, textarea, select):focus-visible { background-color: var(--color-white); outline-color: var(--theme-border); outline-width: 2px; }
 html[data-skin="frappe"] button { box-shadow: none; }
 html[data-skin="frappe"] :is(button, a):hover { rotate: 0deg; }
 html[data-skin="frappe"] .post-card {
   margin-top: 0;
   transform: none;
   rotate: none;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--theme-border);
   border-radius: 10px;
   padding: 20px 24px;
   box-shadow: 0 1px 3px rgb(0 0 0 / .04);
 }
 html[data-skin="frappe"] .post-body { font-size: 14px; font-weight: 400; line-height: 1.65; }
-html[data-skin="frappe"] .post-category { rotate: none; background: #f3f3f3 !important; color: #525252; border: 0; border-radius: 5px; padding: 3px 8px; font-size: 11px; letter-spacing: .02em; }
-html[data-skin="frappe"] .post-card > div:first-child .font-note { font-size: 12px; color: #737373; }
-html[data-skin="frappe"] .post-card > div:first-child span[style] { background-color: transparent !important; color: #252525; border: 0; }
+html[data-skin="frappe"] .post-category { rotate: none; background: var(--theme-tint) !important; color: var(--theme-muted); border: 0; border-radius: 5px; padding: 3px 8px; font-size: 11px; letter-spacing: .02em; }
+html[data-skin="frappe"] .post-card > div:first-child .font-note { font-size: 12px; color: var(--theme-muted); }
+html[data-skin="frappe"] .post-card > div:first-child span[style] { background-color: transparent !important; color: var(--color-ink); border: 0; }
 html[data-skin="frappe"] .post-card img { border-radius: 6px; }
 html[data-skin="frappe"] .post-card > div:last-child { border-top-style: solid; }
 html[data-skin="frappe"] .post-card button { font-size: 12px; font-weight: 500; }
 html[data-skin="frappe"] .skin-card { border-radius: 10px; }
-html[data-skin="frappe"] .skin-selected { color: #fff; border-radius: 5px; }
+html[data-skin="frappe"] .skin-selected { color: var(--color-ink); border-radius: 5px; }
 html[data-skin="frappe"] .skin-studio-hero h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 600; letter-spacing: -.04em; line-height: 1.15; }
-html[data-skin="frappe"] .skin-studio-hero > p:first-child { font-size: 13px; color: #737373; margin-bottom: 8px; }
+html[data-skin="frappe"] .skin-studio-hero > p:first-child { font-size: 13px; color: var(--theme-muted); margin-bottom: 8px; }
 html[data-skin="frappe"] .skin-studio-hero > p:last-child { font-size: 14px; font-weight: 400; }
-html[data-skin="frappe"] .site-navigation { background: #fff; }
+html[data-skin="frappe"] .site-navigation { background: var(--color-white); }
 html[data-skin="frappe"] .site-navigation nav > a { box-shadow: none; border: 0; border-radius: 6px; font-weight: 500; }
-html[data-skin="frappe"] .site-navigation nav > a:hover { background: #ededed; }
-html[data-skin="frappe"] .site-navigation nav > a[aria-current="page"] { background: #e9e9e9; color: #171717; }
+html[data-skin="frappe"] .site-navigation nav > a:hover { background: var(--theme-tint); }
+html[data-skin="frappe"] .site-navigation nav > a[aria-current="page"] { background: var(--theme-tint); color: var(--color-ink); }
 html[data-skin="frappe"] .site-navigation nav > a > .absolute { display: none; }
 html[data-skin="frappe"] .site-navigation img { border-radius: 6px; border: 0; }
-html[data-skin="frappe"] .site-navigation img.bg-lime { background-color: #f3f3f3; }
+html[data-skin="frappe"] .site-navigation img.bg-lime { background-color: var(--theme-tint); }
 [data-preview-skin="frappe"] { grid-template-columns: .8fr 2.5fr 1fr; border-bottom: 1px solid #e5e7eb; }
 [data-preview-skin="frappe"] .skin-preview-main { border: 1px solid #e5e7eb; border-radius: 6px; }
 [data-preview-skin="frappe"] .skin-preview-brand { border-radius: 4px; color: white; }
 @media (min-width: 1024px) {
-  html[data-skin="frappe"] .site-navigation { position: fixed; inset: 0 auto 0 0; width: 224px; height: 100dvh; border: 0; border-right: 1px solid #e5e7eb; box-shadow: none; }
+  html[data-skin="frappe"] .site-navigation { position: fixed; inset: 0 auto 0 0; width: 224px; height: 100dvh; border: 0; border-right: 1px solid var(--theme-border); box-shadow: none; }
   html[data-skin="frappe"] .site-navigation > div { height: 100%; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 28px; padding: 20px 12px; }
   html[data-skin="frappe"] .site-navigation > div > a { padding: 0 8px; }
   html[data-skin="frappe"] .site-navigation nav { flex-direction: column; align-items: stretch; gap: 4px; }

@@ -18,6 +18,23 @@ class Settings(BaseSettings):
     app_env: Literal["development", "production", "test"] = "development"
     cookie_secure: bool | None = None
     admin_emails: str = ""
+    google_client_id: str = ""
+    web_push_public_key: str = ""
+    web_push_private_key: str = ""
+    web_push_subject: str = ""
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_from_name: str = "FMLCore"
+    smtp_security: Literal["starttls", "ssl", "plain"] = "starttls"
+    email_otp_secret: str = ""
+    email_otp_ttl_seconds: int = Field(default=600, ge=60, le=1800)
+    email_otp_resend_seconds: int = Field(default=60, ge=30, le=300)
+    email_otp_max_attempts: int = Field(default=5, ge=1, le=10)
+    email_max_per_hour: int = Field(default=10, ge=1, le=30)
+    email_otp_every_login: bool = False
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.8-flash"
     gemini_embedding_model: str = "gemini-embedding-001"
@@ -32,11 +49,16 @@ class Settings(BaseSettings):
     same_sky_required_posts: int = Field(default=3, ge=1, le=100)
     same_sky_required_confessions: int = Field(default=3, ge=1, le=100)
     same_sky_retry_minutes: int = Field(default=1440, ge=1, le=43200)
+    same_sky_worker_managed: bool = False
     same_sky_job_poll_seconds: float = Field(default=2.0, ge=0.5, le=60)
 
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def email_ready(self) -> bool:
+        return bool(self.smtp_host and self.smtp_from_email)
 
     @property
     def use_secure_cookies(self) -> bool:

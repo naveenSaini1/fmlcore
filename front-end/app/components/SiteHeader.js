@@ -2,104 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useState } from "react";
 import { getUnreadCount } from "../../lib/api";
-import { getChatUnreadCount } from "../../lib/chatApi";
-import { useWebSocketEvent, WS_EVENTS } from "../../lib/websocket";
-import { THEMES, SYSTEM_THEME, themeByKey } from "../../lib/themes";
-import { useTheme } from "./ThemeProvider";
-
-function ThemeSelector() {
-  const { theme, chooseTheme, ready, saving, error } = useTheme();
-  const reduce = useReducedMotion();
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
-  const selected = themeByKey(theme);
-  const themes = [SYSTEM_THEME, ...THEMES];
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onPointer = (event) => {
-      if (!rootRef.current?.contains(event.target)) setOpen(false);
-    };
-    const onKey = (event) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  return (
-    <div className="relative" ref={rootRef}>
-      <motion.button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-label={`Theme: ${selected.label}`}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        whileHover={reduce ? undefined : { rotate: 8, scale: 1.08 }}
-        whileTap={reduce ? undefined : { scale: 0.9 }}
-        className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-ink bg-white shadow-[3px_3px_0_var(--color-shadow)]"
-      >
-        <span className="h-5 w-5 rounded-full border border-ink" style={{ background: selected.color }} />
-      </motion.button>
-      <AnimatePresence>
-        {open ? (
-          <motion.section
-            role="dialog"
-            aria-label="Choose a theme"
-            initial={reduce ? false : { opacity: 0, y: -8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={reduce ? undefined : { opacity: 0, y: -5, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 360, damping: 26 }}
-            className="absolute right-0 top-full z-50 mt-3 w-[min(92vw,23rem)] border-4 border-ink bg-white p-4 text-ink shadow-[8px_8px_0_var(--color-shadow)]"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-note text-2xl leading-none">change the whole mood</p>
-                <h2 className="font-display text-xl font-extrabold">Pick a theme</h2>
-              </div>
-              <button type="button" onClick={() => setOpen(false)} aria-label="Close theme picker" className="border-2 border-ink px-2 py-1 font-extrabold">×</button>
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-6">
-              {themes.map((item) => {
-                const active = theme === item.key;
-                return (
-                  <motion.button
-                    key={item.key}
-                    type="button"
-                    disabled={!ready}
-                    aria-label={item.label}
-                    aria-pressed={active}
-                    onClick={() => chooseTheme(item.key)}
-                    whileHover={reduce || !ready ? undefined : { y: -3, scale: 1.04 }}
-                    whileTap={reduce || !ready ? undefined : { scale: 0.92 }}
-                    className="flex flex-col items-center gap-1 text-center text-[10px] font-extrabold disabled:opacity-50"
-                  >
-                    <span className={`flex h-10 w-10 items-center justify-center rounded-full border-2 border-ink text-on-brand ${active ? "ring-2 ring-ink ring-offset-2" : ""}`} style={{ background: item.color }}>
-                      {active ? <span aria-hidden>✓</span> : null}
-                    </span>
-                    {item.label}
-                  </motion.button>
-                );
-              })}
-            </div>
-            <p className="mt-4 text-xs font-semibold text-ink/70">
-              {saving ? "Saving your palette…" : ready ? "Changes preview instantly and save automatically." : "Loading your palette…"}
-            </p>
-            <Link href="/settings/appearance" onClick={() => setOpen(false)} className="mt-3 inline-block text-xs font-extrabold underline underline-offset-4">Open Skin Studio →</Link>
-            {error ? <p className="mt-2 text-xs font-bold text-danger" role="alert">{error}</p> : null}
-          </motion.section>
-        ) : null}
-      </AnimatePresence>
-    </div>
-  );
-}
+import { useWebSocket } from "../../lib/websocket";
+import GuestAppearance from "./GuestAppearance";
 
 function BellIcon({ className = "h-4 w-4" }) {
   return (
@@ -138,54 +45,52 @@ function ChatIcon({ className = "h-4 w-4" }) {
   );
 }
 
-function UnreadBadge() {
+function useNotificationUnread(enabled) {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    const refresh = () => getUnreadCount().then((data) => setCount(data.count)).catch(() => setCount(0));
-    const refreshWhenVisible = () => { if (document.visibilityState === "visible") refresh(); };
+    if (!enabled) { setCount(0); return; }
+    let active = true;
+    let revision = 0;
+    const refresh = async () => {
+      const requestRevision = ++revision;
+      try {
+        const data = await getUnreadCount();
+        if (active && requestRevision === revision) setCount(data.count);
+      } catch { /* Keep the last known count during a temporary outage. */ }
+    };
     refresh();
     window.addEventListener("fmlcore:notifications-change", refresh);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
+      active = false;
       window.removeEventListener("fmlcore:notifications-change", refresh);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, []);
+  }, [enabled]);
 
-  return count ? <span className="ml-1 inline-flex min-w-5 items-center justify-center border border-ink bg-coral px-1 text-[10px] font-extrabold text-on-brand">{count > 99 ? "99+" : count}</span> : null;
+  return count;
 }
 
-function ChatUnreadBadge() {
-  const [count, setCount] = useState(0);
+function useChatUnread(enabled) {
+  const { chatUnreadCount } = useWebSocket();
+  return enabled ? chatUnreadCount : 0;
+}
 
-  const refresh = () => {
-    getChatUnreadCount().then((data) => setCount(data.count)).catch(() => setCount(0));
+function UnreadBadge({ count }) {
+  return count ? <span className="nav-unread ml-1 inline-flex min-w-5 items-center justify-center border border-ink bg-coral px-1 text-[10px] font-extrabold text-on-brand">{count > 99 ? "99+" : count}</span> : null;
+}
+
+function MobileIcon({ name }) {
+  const paths = {
+    home: <><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" /></>,
+    explore: <><circle cx="12" cy="12" r="9" /><path d="m16 8-2.5 5.5L8 16l2.5-5.5z" /></>,
+    confession: <><path d="M8 16c-2-2-3-4-3-7a7 7 0 0 1 14 0c0 3-1 5-3 7l-4 2zM12 18c-3 3 3 3 0 6" /><path d="M8 7c0-1 .5-2 2-2" /></>,
+    sky: <><path d="M7 18H6a4 4 0 0 1-1-8 7 7 0 0 1 13-2 5 5 0 0 1 0 10h-1" /><path d="m12 12 1.2 2.8L16 16l-2.8 1.2L12 20l-1.2-2.8L8 16l2.8-1.2z" /></>,
+    leaderboard: <><path d="M8 3h8v5a4 4 0 0 1-8 0zM8 5H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4M12 12v6m-4 3h8m-6-3h4v3" /></>,
+    about: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6m0-10v.1" /></>,
   };
-
-  useEffect(() => {
-    refresh();
-    const refreshWhenVisible = () => { if (document.visibilityState === "visible") refresh(); };
-    window.addEventListener("fmlcore:chat-change", refresh);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    return () => {
-      window.removeEventListener("fmlcore:chat-change", refresh);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
-  }, []);
-
-  useWebSocketEvent(WS_EVENTS.CHAT_MESSAGE, () => refresh());
-  useWebSocketEvent(WS_EVENTS.CHAT_MESSAGE_READ, () => refresh());
-
-  return count ? (
-    <span className="ml-1 inline-flex min-w-5 items-center justify-center border border-ink bg-coral px-1 text-[10px] font-extrabold text-on-brand animate-pulse">
-      {count > 99 ? "99+" : count}
-    </span>
-  ) : null;
+  if (name === "chat") return <ChatIcon className="mobile-nav-icon" />;
+  if (name === "notifications") return <BellIcon className="mobile-nav-icon" />;
+  return <svg className="mobile-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
 function ActiveIndicator({ reduce }) {
@@ -195,10 +100,25 @@ function ActiveIndicator({ reduce }) {
 export default function SiteHeader({ user }) {
   const pathname = usePathname();
   const reduce = useReducedMotion();
+  const notificationCount = useNotificationUnread(Boolean(user));
+  const chatCount = useChatUnread(Boolean(user));
   const isActive = (href) => href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
   const navClass = (active) => `relative border-2 border-ink px-2 py-2 shadow-[3px_3px_0_var(--color-shadow)] sm:px-3 ${active ? "bg-soft-purple text-ink" : "bg-white"}`;
 
-  return (
+  const mobileItems = [
+    { href: "/", label: "Home", icon: "home" },
+    { href: "/explore", label: "Explore", icon: "explore" },
+    { href: "/confessions", label: "Confession", icon: "confession" },
+    ...(user ? [
+      { href: "/same-sky", label: "Same Sky", icon: "sky" },
+      { href: "/chat", label: "Chat", icon: "chat" },
+    ] : [
+      { href: "/leaderboard", label: "Leaderboard", icon: "leaderboard" },
+      { href: "/me", label: "About", icon: "about" },
+    ]),
+  ];
+
+  return <>
     <header className="site-navigation sticky top-0 z-20 border-b-4 border-ink bg-paper/95">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
         <Link href="/" aria-label="FMLCore home" aria-current={isActive("/") ? "page" : undefined} className={`relative flex items-center gap-2 ${isActive("/") ? "text-ink" : ""}`}>
@@ -208,19 +128,19 @@ export default function SiteHeader({ user }) {
         </Link>
         <nav className="flex items-center gap-1 text-xs font-bold sm:gap-2 sm:text-sm" aria-label="Main navigation">
           <Link href="/explore" aria-label="Explore" aria-current={isActive("/explore") ? "page" : undefined} className={navClass(isActive("/explore"))}>
-            <span className="sm:hidden" aria-hidden>✦</span><span className="hidden sm:inline">Explore</span>
+            <span>Explore</span>
             {isActive("/explore") ? <ActiveIndicator reduce={reduce} /> : null}
           </Link>
           <Link href="/confessions" aria-label="Confession" aria-current={isActive("/confessions") ? "page" : undefined} className={navClass(isActive("/confessions"))}>
-            <span className="sm:hidden" aria-hidden>◯</span><span className="hidden sm:inline">Confession</span>
+            <span>Confession</span>
             {isActive("/confessions") ? <ActiveIndicator reduce={reduce} /> : null}
           </Link>
           <Link href="/leaderboard" aria-label="Leaderboard" aria-current={isActive("/leaderboard") ? "page" : undefined} className={navClass(isActive("/leaderboard"))}>
-            <span className="sm:hidden" aria-hidden>🏆</span><span className="hidden sm:inline">Leaderboard</span>
+            <span>Leaderboard</span>
             {isActive("/leaderboard") ? <ActiveIndicator reduce={reduce} /> : null}
           </Link>
           {user ? <Link href="/same-sky" aria-label="Same Sky" aria-current={isActive("/same-sky") ? "page" : undefined} className={navClass(isActive("/same-sky"))}>
-            <span className="sm:hidden" aria-hidden>☁</span><span className="hidden sm:inline">Same Sky</span>
+            <span>Same Sky</span>
             {isActive("/same-sky") ? <ActiveIndicator reduce={reduce} /> : null}
           </Link> : null}
           {user ? (
@@ -230,9 +150,9 @@ export default function SiteHeader({ user }) {
               aria-current={isActive("/chat") ? "page" : undefined}
               className={`flex items-center ${navClass(isActive("/chat"))}`}
             >
-              <ChatIcon className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+              <ChatIcon className="nav-icon h-4 w-4 sm:h-4.5 sm:w-4.5" />
               <span className="common-ground-nav-label">Chat</span>
-              <ChatUnreadBadge />
+              <UnreadBadge count={chatCount} />
               {isActive("/chat") ? <ActiveIndicator reduce={reduce} /> : null}
             </Link>
           ) : null}
@@ -246,9 +166,9 @@ export default function SiteHeader({ user }) {
               aria-label="Notifications"
               className={`flex items-center ${navClass(isActive("/notifications"))}`}
             >
-              <BellIcon className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-              <span className="common-ground-nav-label">Updates</span>
-              <UnreadBadge />
+              <BellIcon className="nav-icon h-4 w-4 sm:h-4.5 sm:w-4.5" />
+              <span className="common-ground-nav-label">Notifications</span>
+              <UnreadBadge count={notificationCount} />
               {isActive("/notifications") ? <ActiveIndicator reduce={reduce} /> : null}
             </Link>
           ) : (
@@ -257,11 +177,21 @@ export default function SiteHeader({ user }) {
               <Link href="/signup" aria-current={isActive("/signup") ? "page" : undefined} className={navClass(isActive("/signup"))}>Join{isActive("/signup") ? <ActiveIndicator reduce={reduce} /> : null}</Link>
             </>
           )}
-          {user ? <Link href="/profile" aria-current={isActive("/profile") ? "page" : undefined} className={`${navClass(isActive("/profile"))} max-w-24 truncate sm:max-w-none`}>@{user.username}{isActive("/profile") ? <ActiveIndicator reduce={reduce} /> : null}</Link> : null}
-          {user ? <Link href="/settings/appearance" aria-label="Skin Studio" aria-current={isActive("/settings") ? "page" : undefined} className={`${navClass(isActive("/settings"))} hidden lg:block`}>Skin{isActive("/settings") ? <ActiveIndicator reduce={reduce} /> : null}</Link> : null}
-          <ThemeSelector />
         </nav>
+        {!user && <GuestAppearance />}
+        <div className="mobile-header-actions">
+          {user ? <>
+            <Link href="/leaderboard" aria-label="Leaderboard" title="Leaderboard" aria-current={isActive("/leaderboard") ? "page" : undefined}><MobileIcon name="leaderboard" /></Link>
+            <Link href="/notifications" aria-label="Notifications" title="Notifications" aria-current={isActive("/notifications") ? "page" : undefined}><MobileIcon name="notifications" /><UnreadBadge count={notificationCount} /></Link>
+          </> : <><Link href="/login">Log in</Link><Link href="/signup" className="mobile-guest-join">Join</Link></>}
+        </div>
       </div>
     </header>
-  );
+    <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
+      {mobileItems.map((item) => <Link key={item.href} href={item.href} aria-label={item.label} title={item.label} aria-current={isActive(item.href) ? "page" : undefined}>
+        <span className="mobile-nav-symbol"><MobileIcon name={item.icon} />{item.icon === "chat" && <UnreadBadge count={chatCount} />}</span>
+        <span className="sr-only">{item.label}</span>
+      </Link>)}
+    </nav>
+  </>;
 }

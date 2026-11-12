@@ -111,11 +111,15 @@ td { border-bottom: 1px solid var(--line); padding: 11px 8px; vertical-align: to
 .graph-panel { margin-bottom: 22px; padding: 19px; overflow: hidden; }
 .graph-panel .panel-head { margin-bottom: 5px; }
 .graph-panel .panel-head h2 { font-size: 25px; }
-.match-graph { display: block; width: 100%; max-height: 470px; color: var(--ink); }
+.match-graph-scroll { max-height: 600px; overflow: auto; border: 1px solid var(--line); margin: 12px 0; }
+.match-graph { display: block; margin: 0 auto; max-width: none; color: var(--ink); }
+.threshold-status { padding: 9px 12px; font-size: 12px; line-height: 1.5; border: 1px solid var(--ink); }
+.threshold-status.passed { background: #ffded9; }
+.threshold-status.below { background: #e7ddff; }
 .graph-center-label { font: 800 13px var(--font-outfit), sans-serif; }
 .graph-center-sub { font: 800 8px var(--font-outfit), sans-serif; letter-spacing: .08em; }
 .graph-node { cursor: pointer; outline: none; }
-.graph-node:focus circle, .graph-node:hover circle { stroke: var(--coral); stroke-width: 5; }
+.graph-node.selected circle, .graph-node:focus circle, .graph-node:hover circle { stroke: var(--coral); stroke-width: 5; }
 .graph-score { font: 800 16px var(--font-syne), sans-serif; pointer-events: none; }
 .graph-node-label { font: 700 9px var(--font-outfit), sans-serif; pointer-events: none; }
 .graph-empty { display: grid; min-height: 190px; place-items: center; padding: 24px; color: #716b61; text-align: center; }

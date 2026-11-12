@@ -1,5 +1,10 @@
 # FMLCore — Stage 13: Skin Studio
 
+As of 12 November 2026, signed-in skin and color controls live in **Edit
+Profile** (`/profile`). The standalone Skin Studio and signed-out appearance
+picker remain available. The historical build notes below describe earlier
+placements on Home.
+
 **Status:** Implementation in progress. The shared provider, registry,
 appearance screen, preference API, and migration are in the working tree;
 database migration and end-to-end visual verification remain required before a
@@ -30,7 +35,7 @@ the existing string preference supports it without another database migration.
 | Key | Name | Direction |
 |---|---|---|
 | `common-ground` | Common Ground | Manrope headings, Inter body, sage and warm neutrals, quiet horizontal navigation, readable story cards, and a community rail. |
-| `calm` | Calm Chaos | Default. Poppins typography, warm white, spacious, readable, horizontal navigation and a clear feed. |
+| `calm` | Calm Chaos | Default. Original Syne/Outfit/Caveat typography, dotted paper, bold borders, hard shadows, squared controls, and lightly tilted cards. |
 | `social` | Social Classic | Familiar social structure, fixed left navigation, conventional cards, clear discovery. |
 | `after-hours` | After Hours | Dark-first, high-contrast, sophisticated compact surfaces with controlled lime and purple accents. |
 | `frappe` | Frappe | Inter typography, neutral compact surfaces, desktop sidebar, and aligned workspace cards. |
@@ -53,18 +58,28 @@ This is an original FMLCore design, not a copy of either design system.
 
 Browser verification uses representative local API fixtures for Explore,
 home, profile, notifications, Same Sky, chat, Confession Sky, and appearance at
-1440, 768, and 390 CSS pixels. It checks preview/apply, font selection, runtime
+1440, 768, and 390 CSS pixels. It checks skin selection, font selection, runtime
 errors, and horizontal overflow. These visual checks do not replace live
 provider/matching, message delivery, or cross-device account tests.
 
 ## Required experience
 
-- Add `/settings/appearance` with the title **Make FMLCore yours.** and the
-  subtitle *Choose the way you want to experience the internet.*
-- Show preview cards for all five skins with a name, short description,
-  representative visual preview, selected state, Preview, Apply, and Cancel.
-- Preview is temporary. Apply updates the active skin immediately and saves it;
-  Cancel returns to the currently applied skin. No full-page reload.
+- Provide compact circular selectors on home and `/settings/appearance`.
+  Each circle has an accessible full name, a short visible label, and a selected
+  checkmark. Home uses a profile-led layout with stories and appearance controls;
+  Edit profile opens the existing `/profile` page.
+- Selecting a circle immediately applies and saves the skin without a page
+  reload. Disable selection while saving and roll back on failure. This replaces
+  the original large preview-card and separate Preview/Apply/Cancel design.
+- Place a second row of compact color-theme circles beneath skins, replacing
+  the navbar theme picker. Keep the existing five theme IDs and System option.
+  Skin controls layout and fonts; theme controls backgrounds, text, surfaces,
+  accents, borders, and controls across every skin. Both selections save
+  independently, immediately, and roll back if persistence fails.
+- Signed-out visitors access both selectors through the navbar's Skins & colors
+  dialog (palette icon on mobile). It reuses Skin Studio, supports Escape and
+  outside-click dismissal, and persists guest preferences locally. Signed-in
+  customization remains on home, and account preferences take over on login.
 - Apply every skin consistently to navigation, home/feed, post cards, buttons,
   typography, backgrounds, sidebars, notifications, profiles, Confession Sky,
   Same Sky, chat, Explore, leaderboard, and settings.
@@ -77,11 +92,16 @@ provider/matching, message delivery, or cross-device account tests.
 ## Architecture constraints
 
 The shared shell and card markup now expose stable presentation classes.
-`front-end/app/skins.css` owns the complete skin variants: Calm's airy rounded
-reading surfaces, Social Classic's desktop sidebar and conventional cards,
+`front-end/app/skins.css` owns the complete skin variants: Calm's original bold,
+squared reading surfaces, Social Classic's desktop sidebar and conventional cards,
 and After Hours' dock and focused dark reading column. Frappe keeps its compact workspace layout. Mobile variants
 return to a single reading column and wrapping navigation. These changes keep
 the same feature components mounted when switching skins.
+
+Shared post cards use a compact reading rhythm: author and time on one line,
+body aligned beneath the author, category/mood together, and short gaps before
+reactions. On phones the action row uses the full card width to avoid excess
+wrapping. Each skin retains its own typography, borders, and shadows.
 
 - Use the existing Next.js App Router, React, JavaScript, Tailwind, Motion, and
   CSS variables. Do not introduce TypeScript.
@@ -96,6 +116,9 @@ the same feature components mounted when switching skins.
 - Adapt the current `ThemeProvider` and theme preference safely. Existing
   theme data must remain valid during migration and must never be silently
   overwritten.
+- `app/theme-colors.css` loads after skin styles and owns palette tokens.
+  Skin rules use semantic palette roles rather than fixed surface/text colors.
+  This prevents a skin from masking the saved theme selection.
 
 ## Delivery phases
 
@@ -106,7 +129,7 @@ the same feature components mounted when switching skins.
 3. Add shared app-shell layout variants around shared page content.
 4. Make shared components skin-aware; remove presentation assumptions that
    bypass semantic tokens.
-5. Build the Skin Studio selector and realistic previews.
+5. Build the compact Skin Studio circle selector and selected-state feedback.
 6. Persist and load the signed-in preference without flash-of-default.
 7. Test all screens and all skins across desktop, tablet, and mobile.
 
@@ -116,8 +139,8 @@ Verification builds can run with `NEXT_BUILD_DIR=.next-verify npm run build`
 from `front-end/`. This keeps the live development server's `.next` manifests
 separate and prevents build verification from corrupting its module cache.
 
-Preview cleanup restores the applied preference when leaving the appearance
-page. Failed preference saves restore the previous skin, and local caching is
+Selection applies immediately on home and the appearance page. Failed preference
+saves restore the previous skin, and local caching is
 best-effort when browser storage is unavailable.
 
 1. Switching changes the complete visual system without reload, state loss, or
@@ -138,9 +161,8 @@ best-effort when browser storage is unavailable.
 - Existing functionality is shared, not rewritten per skin.
 - Stage 13 does not add product features or alter permissions.
 
-## Approval gate
+## Approved color-theme treatment
 
-Before code begins, the owner must explicitly approve the Stage 13 scope and
-the treatment of the existing five-colour theme setting. On approval, the first
-implementation decision is whether legacy theme choices map into Calm Chaos
-accents or remain as a separate compatibility preference during a transition.
+The owner approved independent color themes alongside skins. Existing theme
+preferences remain valid. Color circles live beneath the skin circles on home
+and the appearance page, and there is no theme picker in the navbar.

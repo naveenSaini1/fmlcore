@@ -6,15 +6,110 @@ This file is the pick-up point for anyone (human or AI) continuing the build. Re
 [fmlcore-vision.md](fmlcore-vision.md) for product intent and [../CHANGELOG.md](../CHANGELOG.md)
 for the per-version log.
 
+## Live leaderboard, profile appearance, and browser push — 12 November 2026
+
+The weekly leaderboard panel and full page refresh when committed reactions
+change. Guests and signed-in users get the same change signal over SSE, with
+server-side visibility checks on each ranking request. Private stories are
+excluded. Skins and color themes moved from signed-in Home into Edit Profile.
+The guest appearance picker and standalone Skin Studio remain available.
+
+Browser notifications are opt-in per browser from Notifications or Edit
+Profile. The service worker can show generic activity alerts with the tab
+closed. Migration 0917 adds the committed delivery queue. Web Push keys persist
+in production secret state. The FML smiley is the favicon, and public routes
+have search metadata, a sitemap, and a branded share image.
+
+Production build assets, the frozen 0901 baseline, and the deployer are now
+tracked. Deploy the intended Git commit directly, without reusing the old source
+archive. See [SERVER_RUNBOOK.md](SERVER_RUNBOOK.md) for release and verification
+steps.
+
+## Deployment and admin repair — 11 November 2026
+
+Public app and admin are deployed at https://fmlcore.com and
+https://admin.fmlcore.com with trusted HTTPS. The 10 GB boot disk plus a separate
+20 GB application disk, private deployment bundle, source overrides and update
+procedures are recorded in [SERVER_RUNBOOK.md](SERVER_RUNBOOK.md). Use it before redeploying.
+
+Admin now supports Google login for existing accounts, with the same backend
+email allowlist. The operator saved the admin OAuth origin. An authenticated
+admin overview initially failed because `pgrep` was absent in the API container.
+Worker status now supports separate-container deployments through a named
+PostgreSQL listener (`SAME_SKY_WORKER_MANAGED=true`); process controls are blocked
+in that mode. Both admin API wrappers handle non-JSON failures. Regression tests
+and a production admin build passed; authenticated overview/status/users now
+return `200` JSON and anonymous access remains `401`.
+
+Update this handoff, the changelog, and affected feature/deployment docs whenever
+behavior or server setup changes; record what was actually verified and pending.
+
+## Snapshot update — 11 November 2026
+
+Public author links now open `/users/{username}` with separate public Posts and
+Confessions tabs. API filtering excludes anonymous and private content, including
+for the owner, and honors blocking and muting. Public profile responses omit email.
+
+Same Sky cards and chat use match-scoped aliases and opaque IDs. Chat participants
+store `profile_revealed` (self-controlled consent) and `nickname` (a label for the
+other person visible only to the owner). Sharing is one-sided per conversation;
+withdrawing hides profile fields again. REST and socket messages, history,
+summaries, typing, read receipts, presence, and Same Sky notifications avoid public
+identity leaks. Identity-change events invalidate cached views before refresh;
+reconnect reloads selected chat details/history. Migration `20261111_0916` is
+applied locally and defaults all existing participants to hidden profiles.
+
+Privacy integration tests use rolled-back PostgreSQL transactions. Public profile
+links and content tabs were checked in the local browser. Consent controls and
+message/typing payloads have API integration coverage. The remaining broader chat
+safety/production work below still applies; this update does not complete Stage 9-2.
+
 ## Current handoff — 9 November 2026
 
 ### Snapshot update — 10 November 2026
 
+Authentication now supports Google Identity Services and signup-only email OTP.
+New email/password accounts confirm email ownership before account creation.
+Password login stays normal, and existing accounts/data are left unchanged.
+`EMAIL_OTP_EVERY_LOGIN=false` is the default.
+New passwords are held only as hashes in temporary challenges until email
+verification. Google onboarding requires a valid unique username and 18+
+confirmation; existing-email Google linking requires an emailed code. SMTP
+transport/templates and verification logic are reusable services. Migration
+`20261110_0913` is applied locally. SMTP and GOOGLE_CLIENT_ID are not configured;
+live delivery and Google sign-in remain unverified/disabled until setup. See
+[AUTHENTICATION.md](AUTHENTICATION.md) for settings, tests, and account rules.
+
+Auth tests run on migrated local PostgreSQL and an isolated current-model schema.
+A clean replay of all historical migrations is blocked by the pre-existing 0901
+bootstrap importing current models, leaving `same_sky_entries` missing at 0902.
+The existing-database 0912→0913 authentication migration succeeds.
+
 The repository now contains Stage 13 Skin Studio and the existing, in-progress
 Stage 9-2 chat/WebSocket implementation. Skin Studio includes Calm Chaos,
 Social Classic, After Hours, Frappe, and Common Ground, plus Leaderboard in the
-main navigation. The requested `/` Your Space/Profile/Skins navigation change
-has not started; the owner requested a branch/merge checkpoint first.
+main navigation. After the branch/merge checkpoint, signed-in `/` now combines
+a profile-photo header, owned stories, and small skin circles on one page.
+Edit profile opens `/profile`; the inline Profile & account section was removed.
+Selecting a skin applies and saves it immediately, with rollback on save failure.
+Story drafts stay mounted during skin changes.
+Calm Chaos restores the original pre-Skin-Studio fonts, dotted paper, bold borders,
+hard shadows, and tilted story cards. Other skins and current navigation remain.
+Signed-in color-theme circles live beneath the skin circles on home, with no
+signed-in navbar picker.
+Signed-out visitors have a Skins & colors button in the navbar (palette icon on
+phones), opening the shared circle selectors in an accessible dialog. Guest
+choices persist on the browser and never write account preferences; signing in
+restores account settings, and signing out restores the guest choices.
+`theme-colors.css` owns shared palette roles so themes update surfaces, text,
+accents, and borders across every skin without changing layout or fonts.
+The 5-skin × 6-theme browser matrix passed at desktop and phone widths, including
+System light/dark changes, reload persistence, failed-save rollback, and drafts.
+Mobile now uses a fixed five-icon bottom bar (Home, Explore, Confession, Same Sky,
+Chat for signed-in people). The compact top header retains Leaderboard and
+Notifications; guests get login/join actions and Leaderboard/About destinations
+in the bottom bar. Safe-area padding reserves space below page content. Desktop
+navigation keeps its existing layout; unread counts are shared between shells.
 
 Frontend production builds and Python compilation pass. Skin presentation was
 checked with local API fixtures across desktop, tablet, and phone sizes;
@@ -107,7 +202,7 @@ Schema and config: `backend/app/models.py`, `backend/app/config.py`, `backend/mi
 
 ### Database and retry configuration
 
-The current local migration head is `20261110_0912`. Revision `20261107_0903` removes the one-attempt-per-day
+The current local migration head is `20261110_0913`. Revision `20261107_0903` removes the one-attempt-per-day
 constraint so a configurable cooldown can support repeat attempts. Local retry is one
 minute for testing (`SAME_SKY_RETRY_MINUTES=1`); production defaults to 1440 minutes.
 Eligibility currently requires 3 posts and 3 confessions and can be changed through
@@ -150,17 +245,17 @@ owner names the stage and gives an explicit "go". The flow each time:
 - [x] **9-1 — Same Sky matching implementation.** Reuses normal FMLCore posts and Confession Sky balloons; each new story is automatically queued for the admin-selected analysis provider and a Gemini pgvector embedding; eligibility counts completed analyses; Start Matching searches saved data locally; mutual accept/decline; configurable no-match retry timer. No duplicate writing flow or chat. Live end-to-end provider verification is still pending; see the handoff above.
 - [ ] **9-2 — Matched-user chat.** Private conversations for mutually accepted Same Sky connections, with safety controls and no access to original private collection entries. *(implementation present; safety and production verification pending)*
 - [ ] **10 — Real-time interactions.** WebSocket updates for core comments, reactions, and in-app notifications. *(planned; not started)*
-- [ ] **11 — Email notifications.** Send real emails for reactions and comments on a user's posts. *(planned; not started)*
+- [ ] **11 — Email notifications.** Send real emails for reactions and comments on a user's posts. *(notification triggers remain planned; reusable SMTP transport/templates now exist for authentication)*
 - **Voice rooms.** Folded into Stage 12; no separate standalone build.
 - [ ] **12 — Voice rooms + full voice meeting rooms.** Includes the social audio rooms and full meeting-room experience. *(future; deferred for now)*
-- [ ] **13 — Skin Studio.** Five user-selectable presentation skins—Calm Chaos, Social Classic, After Hours, Frappe, and Common Ground. Skins change layout, navigation treatment, typography, tokens, component presentation, and interaction styling while sharing the same features, APIs, permissions, and data. The default is Calm Chaos. Selection, preview, local caching, authenticated persistence, accessibility, responsive behavior, and no-refresh switching are required. See [SKIN_STUDIO.md](SKIN_STUDIO.md). *(implementation in progress; full acceptance verification pending)*
+- [ ] **13 — Skin Studio.** Five user-selectable presentation skins—Calm Chaos, Social Classic, After Hours, Frappe, and Common Ground. Skins change layout, navigation treatment, typography, tokens, component presentation, and interaction styling while sharing the same features, APIs, permissions, and data. The default is Calm Chaos. Compact circle selection, local caching, authenticated persistence, accessibility, responsive behavior, and no-refresh switching are required. See [SKIN_STUDIO.md](SKIN_STUDIO.md). *(implementation in progress; full acceptance verification pending)*
 
 ## Back-end (FastAPI — `backend/app`)
 
 - **models.py:** `User` (profile color/sticker/theme), `Post`, `Reaction` (unique per post+user), `Comment` (self-ref `parent_id`, one level deep), `Notification`, `UserBlock`, `UserMute`, `Report`, and Same Sky profiles, analyses linked directly to posts, pgvector embeddings, matches, attempts, and durable jobs.
 - **taxonomy.py:** `CATEGORIES` (10), `MOOD_KEYS` (8), `REACTION_KEYS` (14). Mirrored in `front-end/lib/taxonomy.js`.
 - **main.py endpoints:**
-  - Auth: `POST /auth/signup`, `/auth/login`, `/auth/logout`; `GET /auth/me`
+  - Auth: `POST /auth/signup`, `/auth/login`, `/auth/logout`; `GET /auth/me`; `auth_api.py` adds email verification/resend, Google start/sign-in/onboarding, options, and username availability. See [AUTHENTICATION.md](AUTHENTICATION.md).
   - Profile: `PATCH /profile`, `PATCH /profile/theme`, `POST /profile/avatar`
   - Posts: `POST /posts` (multipart), `GET /posts` (keyset paginated, optional auth → fills `my_reaction`), `GET /posts/{id}`
   - Explore: `GET /explore/taxonomy`, `GET /explore/daily-prompt`, `GET /explore/trending`, `GET /explore/random`; `GET /posts` also accepts category and mood filters.
@@ -286,17 +381,16 @@ remain shared.
 
 The implementation must introduce a centralized skin registry and CSS-variable
 token system; shared, skin-aware layouts and component variants; and the
-`/settings/appearance` Skin Studio page with temporary preview, Apply, and
-Cancel actions. A selected skin must update without a page reload, preserve
+`/settings/appearance` Skin Studio page with compact circular selectors that
+apply immediately. A selected skin must update without a page reload, preserve
 unsent client state and WebSocket connections, persist for signed-in users in
 PostgreSQL, cache locally to avoid flash-of-default, and safely fall back to
 Calm Chaos when a stored value is invalid. Every skin must meet the existing
 responsive, keyboard, focus, contrast, semantic HTML, and reduced-motion bar.
 
-The current five-colour theme picker is an existing feature. Stage 13 must plan
-its migration into Skin Studio deliberately: preserve existing saved theme
-values until mapped or retired through a backward-compatible migration; do not
-silently overwrite a user preference. The implementation sequence and detailed
+The existing five-colour theme picker now lives in Skin Studio beneath the skin
+circles, with System mode retained. Saved theme values remain unchanged and
+control colors independently of skin layout and typography. The implementation sequence and detailed
 acceptance checks are in [SKIN_STUDIO.md](SKIN_STUDIO.md).
 
 ### Delivery phases

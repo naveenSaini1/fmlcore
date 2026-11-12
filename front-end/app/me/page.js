@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getMe } from "../../lib/api";
+import { useSession } from "../../lib/session";
 
 const platformFacts = [
   { label: "Made for", value: "Real life, in all its weirdness" },
@@ -10,8 +9,7 @@ const platformFacts = [
 ];
 
 export default function MePage() {
-  const [user, setUser] = useState(null);
-  useEffect(() => { getMe().then(setUser).catch(() => setUser(null)); }, []);
+  const { user } = useSession();
 
   return (
     <>
