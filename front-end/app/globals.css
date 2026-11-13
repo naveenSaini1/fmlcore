@@ -457,3 +457,16 @@ html[data-skin="frappe"] .site-navigation img.bg-lime { background-color: var(--
     transform: none;
   }
 }
+
+:is(a[href], button:enabled, input:is([type="button"], [type="submit"], [type="reset"]):enabled, summary, [role="button"]:not([aria-disabled="true"])) {
+  cursor: pointer;
+}
+
+/* Keep borders on nested boxes softer than the surrounding cards. */
+.app-content :is(article, section, aside, form) :is(div, section, form, fieldset, label, input, textarea, select).border-ink {
+  border-color: color-mix(in srgb, var(--color-ink) 45%, var(--color-white));
+}
+
+.app-content :is(article, section, aside, form) :is(div, section, form, fieldset, label).border-ink.border-4 {
+  border-width: 2px;
+}

@@ -211,3 +211,7 @@ td { border-bottom: 1px solid var(--line); padding: 11px 8px; vertical-align: to
 .user-story img { display: block; max-width: 100%; max-height: 220px; object-fit: contain; margin-top: 8px; }
 
 .user-story-visibility { margin-left: 8px; font-size: 12px; font-weight: 700; }
+
+:is(a[href], button:enabled, input:is([type="button"], [type="submit"], [type="reset"]):enabled, summary, [role="button"]:not([aria-disabled="true"])) {
+  cursor: pointer;
+}

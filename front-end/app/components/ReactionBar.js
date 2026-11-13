@@ -84,8 +84,10 @@ export default function ReactionBar({ post, onChange }) {
       {used.length > 0 ? (
         <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-ink/70">
           {used.map((r) => (
-            <span key={r.key} title={r.label}>
-              <span aria-hidden>{r.emoji}</span> {post.reactions[r.key]}
+            <span key={r.key} className="inline-flex max-w-full items-center gap-1 rounded border border-[var(--theme-border)] px-1.5 py-0.5">
+              <span aria-hidden="true">{r.emoji}</span>
+              <span>{r.label}</span>
+              <span className="rounded-sm bg-[var(--theme-tint)] px-1 font-extrabold text-ink tabular-nums">{post.reactions[r.key]}</span>
             </span>
           ))}
         </p>

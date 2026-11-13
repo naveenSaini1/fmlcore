@@ -5,8 +5,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased] — 2026-11-12
 
+- Show emoji, labels, and counts in the vote summary and place category and mood above story text.
+- Soften post-card and nested-panel borders.
+- Distinguish Report story from Report account in the post menu.
+- Remove the empty-comments message.
+- Load Explore stories in batches of five as the reader reaches the bottom.
+- Keep existing leaderboard entries in place while loading more.
+- Use the pointer cursor for clickable buttons and links.
 - Count each signed-in account once per shared story.
-- Show comment and share icons with counts. Close comments on outside clicks
+- Show comment and share icons with counts. Toggle comments from the icon
   and indicate successful sharing with a checkmark.
 - Show Join in guest navigation, link notifications to the story or comment,
   and add sharing for public posts and confessions.

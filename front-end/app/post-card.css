@@ -36,3 +36,7 @@ html[data-skin] .post-card .post-engagement-button[data-shared="true"] {
   background: var(--theme-accent, var(--color-lime));
   border-radius: 6px;
 }
+
+html[data-skin] .explore-page .post-card {
+  border: 1px solid var(--theme-border);
+}

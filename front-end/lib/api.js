@@ -190,11 +190,12 @@ export function createConfession({ body, category, mood, isAnonymous, visibility
   return api("/confessions", { method: "POST", body: form });
 }
 
-function exploreQuery({ category, mood, cursor } = {}) {
+function exploreQuery({ category, mood, cursor, limit } = {}) {
   const params = new URLSearchParams();
   if (category) params.set("category", category);
   if (mood) params.set("mood", mood);
   if (cursor) params.set("cursor", cursor);
+  if (limit != null) params.set("limit", String(limit));
   const query = params.toString();
   return query ? `?${query}` : "";
 }
@@ -215,8 +216,8 @@ export function getRandomPost({ category, mood } = {}) {
   return api(`/explore/random${exploreQuery({ category, mood })}`);
 }
 
-export function getExplorePosts({ category, mood, cursor } = {}) {
-  return api(`/posts${exploreQuery({ category, mood, cursor })}`);
+export function getExplorePosts({ category, mood, cursor, limit } = {}) {
+  return api(`/posts${exploreQuery({ category, mood, cursor, limit })}`);
 }
 
 export function getUnreadCount() {

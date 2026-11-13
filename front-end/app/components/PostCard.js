@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { mediaUrl } from "../../lib/api";
 import { categoryAccent, moodByKey } from "../../lib/taxonomy";
 import { timeAgo } from "../../lib/format";
@@ -16,29 +16,7 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
   const [livePost, setLivePost] = useState(initial);
   useEffect(() => setLivePost(initial), [initial]);
   const [showComments, setShowComments] = useState(Boolean(focusComment));
-  const commentButton = useRef(null);
-  const commentPanel = useRef(null);
   const panelId = useId();
-  useEffect(() => {
-    if (!showComments) return;
-    function closeOutside(event) {
-      if (!commentButton.current?.contains(event.target) && !commentPanel.current?.contains(event.target)) {
-        setShowComments(false);
-      }
-    }
-    function closeOnEscape(event) {
-      if (event.key === "Escape") {
-        setShowComments(false);
-        if (commentPanel.current?.contains(document.activeElement)) commentButton.current?.focus();
-      }
-    }
-    document.addEventListener("pointerdown", closeOutside);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOutside);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [showComments]);
   const [editing, setEditing] = useState(false);
   const [hiddenBySafety, setHiddenBySafety] = useState(false);
   // In preview mode the parent re-renders with fresh props each keystroke,
@@ -88,18 +66,6 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
         <div className="post-card-menu">{!preview && (onDelete || (viewerId && (!post.author || post.author.id !== viewerId))) ? <details className="post-actions"><summary aria-label="Post actions" title="Post actions">•••</summary><div className="post-actions-menu">{onDelete ? <>{onEdit && <button type="button" onClick={event => { event.currentTarget.closest("details").open = false; setEditing(true); }} className="block w-full border-2 border-ink bg-white px-2 py-1 text-left text-xs font-extrabold">Edit {post.surface === "confession" ? "confession" : "post"}</button>}<button type="button" disabled={deleting} onClick={onDelete} className="block w-full border-2 border-ink bg-coral px-2 py-1 text-left text-xs font-extrabold">{deleting ? "Deleting…" : "Delete post"}</button></> : <><ReportAction targetType="post" targetId={post.id} />{post.author ? <UserSafetyActions target={post.author} onHide={() => setHiddenBySafety(true)} /> : null}</>}</div></details> : null}</div>
       </div>
 
-      {editing ? <EditStory post={post} onCancel={() => setEditing(false)} onSave={updated => { setLivePost(updated); onEdit(updated); setEditing(false); }} /> : <p className="post-body mt-3 whitespace-pre-wrap break-words text-lg font-semibold leading-snug">
-        {post.body}
-      </p>}
-
-      {image ? (
-        <img
-          src={image}
-          alt=""
-          className="post-image mt-4 max-h-96 w-full border-4 border-ink object-cover"
-        />
-      ) : null}
-
       <div className="post-context">
         <span
           className="post-category inline-block -rotate-1 border-2 border-ink px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide text-on-brand"
@@ -113,12 +79,25 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
         </div>
       </div>
 
+      {editing ? <EditStory post={post} onCancel={() => setEditing(false)} onSave={updated => { setLivePost(updated); onEdit(updated); setEditing(false); }} /> : <p className="post-body mt-3 whitespace-pre-wrap break-words text-lg font-semibold leading-snug">
+        {post.body}
+      </p>}
+
+      {image ? (
+        <img
+          src={image}
+          alt=""
+          className="post-image mt-4 max-h-96 w-full border-4 border-ink object-cover"
+        />
+      ) : null}
+
+
+
       {!preview ? (
         <div className="post-interactions mt-4 border-t-2 border-dashed border-ink/40 pt-4">
           <ReactionBar post={post} onChange={setLivePost} />
           <div className="post-engagement">
             <button
-              ref={commentButton}
               type="button"
               onClick={() => setShowComments(open => !open)}
               aria-expanded={showComments}
@@ -133,7 +112,7 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
             </button>
             {post.visibility === "public" && <ShareStory post={post} onCount={share_count => setLivePost(current => ({ ...current, share_count }))} />}
           </div>
-          <div id={panelId} ref={commentPanel} hidden={!showComments}>
+          <div id={panelId} hidden={!showComments}>
             {showComments && <Comments
               post={post}
               focusComment={focusComment}

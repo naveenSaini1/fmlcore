@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getDailyPrompt,
   getExplorePosts,
@@ -10,6 +10,8 @@ import {
 import PostCard from "./PostCard";
 import LeaderboardPanel from "./LeaderboardPanel";
 
+const PAGE_SIZE = 5;
+
 export default function Explore({ user }) {
   const [prompt, setPrompt] = useState(null);
   const [random, setRandom] = useState(false);
@@ -17,6 +19,9 @@ export default function Explore({ user }) {
   const [posts, setPosts] = useState([]);
   const [cursor, setCursor] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [pageError, setPageError] = useState("");
+  const sentinel = useRef(null);
+  const pendingPage = useRef(null);
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
 
@@ -28,10 +33,13 @@ export default function Explore({ user }) {
   useEffect(() => {
     let active = true;
     setStatus("loading");
+    setCursor(null);
+    setLoadingMore(false);
+    setPageError("");
     setError("");
     const request = random
       ? getRandomPost().then(post => ({ items: post ? [post] : [], nextCursor: null }))
-      : getExplorePosts().then(data => ({ items: data.posts, nextCursor: data.next_cursor }));
+      : getExplorePosts({ limit: PAGE_SIZE }).then(data => ({ items: data.posts, nextCursor: data.next_cursor }));
 
     request.then(({ items, nextCursor }) => {
         if (active) {
@@ -46,22 +54,41 @@ export default function Explore({ user }) {
           setStatus("error");
         }
       });
-    return () => { active = false; };
-  }, [random, refreshKey]);
+    return () => {
+      active = false;
+      pendingPage.current = null;
+    };
+  }, [random, refreshKey, user?.id]);
 
-  async function loadMore() {
-    if (!cursor || loadingMore) return;
+  const loadMore = useCallback(async () => {
+    if (random || status !== "ready" || !cursor || pendingPage.current) return;
+    const request = {};
+    pendingPage.current = request;
     setLoadingMore(true);
+    setPageError("");
     try {
-      const data = await getExplorePosts({ cursor });
-      setPosts((current) => [...current, ...data.posts]);
-      setCursor(data.next_cursor);
+      const data = await getExplorePosts({ cursor, limit: PAGE_SIZE });
+      if (pendingPage.current !== request) return;
+      setPosts(current => [...new Map([...current, ...data.posts].map(post => [post.id, post])).values()]);
+      setCursor(data.next_cursor === cursor ? null : data.next_cursor);
     } catch (err) {
-      setError(err.message);
+      if (pendingPage.current === request) setPageError(err.message);
     } finally {
-      setLoadingMore(false);
+      if (pendingPage.current === request) {
+        pendingPage.current = null;
+        setLoadingMore(false);
+      }
     }
-  }
+  }, [random, status, cursor]);
+
+  useEffect(() => {
+    if (random || status !== "ready" || !cursor || pageError || loadingMore || !sentinel.current || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) void loadMore();
+    });
+    observer.observe(sentinel.current);
+    return () => observer.disconnect();
+  }, [random, status, cursor, pageError, loadingMore, loadMore]);
 
   function findAnother() {
     if (!random) setRandom(true);
@@ -120,9 +147,15 @@ export default function Explore({ user }) {
           ) : null}
           {posts.map((post, index) => <PostCard key={post.id} post={post} index={index} viewerId={user?.id} />)}
           {!random && status === "ready" && cursor ? (
-            <button type="button" onClick={loadMore} disabled={loadingMore} className="w-full border-4 border-ink bg-white px-4 py-3 font-extrabold shadow-[4px_4px_0_var(--color-shadow)] disabled:opacity-60">
-              {loadingMore ? "Looking…" : "Load more stories"}
-            </button>
+            <div ref={sentinel} className="min-h-px">
+              {loadingMore && <p className="text-sm" role="status">Loading more stories…</p>}
+              {pageError && <p className="text-sm text-danger" role="alert">{pageError}</p>}
+              {(pageError || typeof IntersectionObserver === "undefined") && !loadingMore && (
+                <button type="button" onClick={loadMore} className="border-2 border-ink bg-white px-3 py-2 text-sm font-extrabold">
+                  {pageError ? "Retry loading stories" : "Load more stories"}
+                </button>
+              )}
+            </div>
           ) : null}
         </div>
       </section>

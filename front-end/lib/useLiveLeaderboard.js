@@ -4,9 +4,12 @@ import { useEffect, useState } from "react";
 import { useSession } from "./session";
 import { getLeaderboard, invalidateApiReads } from "./api";
 
+const emptySnapshot = { entries: [], nextOffset: null, loading: true, error: "" };
+
 export function useLiveLeaderboard(limit = 5) {
   const { user, ready } = useSession();
-  const [snapshot, setSnapshot] = useState({ entries: [], nextOffset: null, loading: true, error: "" });
+  const scope = user?.id ?? null;
+  const [snapshot, setSnapshot] = useState({ ...emptySnapshot, scope });
   useEffect(() => {
     if (!ready) return;
     let active = true;
@@ -14,7 +17,12 @@ export function useLiveLeaderboard(limit = 5) {
     let timer;
     let source;
     let connected = false;
-    setSnapshot({ entries: [], nextOffset: null, loading: true, error: "" });
+    setSnapshot(current => ({
+      ...(current.scope === scope ? current : emptySnapshot),
+      scope,
+      loading: true,
+      error: "",
+    }));
     async function refresh() {
       const version = ++revision;
       invalidateApiReads(["content"]);
@@ -27,7 +35,7 @@ export function useLiveLeaderboard(limit = 5) {
           entries.push(...data.entries);
           nextOffset = data.next_offset;
         }
-        setSnapshot({ entries, nextOffset, loading: false, error: "" });
+        setSnapshot({ entries, nextOffset, loading: false, error: "", scope });
       } catch (error) {
         if (active && version === revision) setSnapshot(current => ({ ...current, loading: false, error: error.message }));
       }
@@ -57,6 +65,6 @@ export function useLiveLeaderboard(limit = 5) {
       window.removeEventListener("focus", schedule);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [ready, user?.id, limit]);
-  return snapshot;
+  }, [ready, scope, limit]);
+  return ready && snapshot.scope === scope ? snapshot : emptySnapshot;
 }

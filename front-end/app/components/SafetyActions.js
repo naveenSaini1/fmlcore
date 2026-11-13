@@ -12,6 +12,7 @@ const REASONS = [
 ];
 
 export function ReportAction({ targetType, targetId }) {
+  const reportLabel = { post: "Report story", comment: "Report comment", user: "Report account" }[targetType] ?? "Report";
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("other");
   const [details, setDetails] = useState("");
@@ -38,7 +39,7 @@ export function ReportAction({ targetType, targetId }) {
   return (
     <div className="mt-2">
       <button type="button" onClick={() => setOpen((value) => !value)} className="text-xs font-extrabold underline">
-        {open ? "Cancel report" : "Report"}
+        {open ? "Cancel report" : reportLabel}
       </button>
       {message ? <p className="mt-1 text-xs font-bold text-ink/70" role="status">{message}</p> : null}
       {open ? (

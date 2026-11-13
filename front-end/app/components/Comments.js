@@ -247,10 +247,6 @@ export default function Comments({ post, onCountChange, viewerId, focusComment }
 
       {status === "loading" ? <p className="mt-3 font-note text-xl leading-none text-ink/70">loading…</p> : null}
 
-      {status === "ready" && comments.length === 0 ? (
-        <p className="mt-3 font-note text-xl leading-none text-ink/70">no comments yet — go first.</p>
-      ) : null}
-
       <div className="mt-3 space-y-3">
         {comments.map((comment) => (
           !hiddenAuthors.has(comment.author?.id) ? (

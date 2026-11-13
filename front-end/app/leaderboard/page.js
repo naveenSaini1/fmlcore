@@ -20,7 +20,7 @@ export default function LeaderboardPage() {
           <p className="mt-3 max-w-xl font-semibold">Posts ranked by reactions received in the last seven days. Anonymous stories stay anonymous.</p>
         </header>
 
-        {status === "loading" ? <p className="font-note text-2xl">Counting the votes…</p> : null}
+        {loading && entries.length === 0 ? <p className="font-note text-2xl">Counting the votes…</p> : null}
         {error ? <p className="mb-4 border-4 border-ink bg-coral p-3 font-bold text-on-brand" role="alert">{error}</p> : null}
         {status === "ready" && entries.length === 0 ? (
           <div className="border-4 border-dashed border-ink bg-white p-8 text-center">
@@ -40,7 +40,7 @@ export default function LeaderboardPage() {
           ))}
         </div>
         {nextOffset !== null ? (
-          <button type="button" onClick={() => setLimit(value => value + 5)} disabled={loading} className="mt-7 w-full border-4 border-ink bg-white px-4 py-3 font-extrabold shadow-[4px_4px_0_var(--color-shadow)] disabled:opacity-60">
+          <button type="button" onClick={() => setLimit(value => value + 5)} disabled={loading} className="mt-7 w-full border-4 border-ink bg-white px-4 py-3 font-extrabold shadow-[4px_4px_0_var(--color-shadow)] [overflow-anchor:none] disabled:opacity-60">
             {loading ? "Loading…" : "Load more"}
           </button>
         ) : null}
