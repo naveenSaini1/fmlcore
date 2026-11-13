@@ -37,6 +37,7 @@ class User(Base):
     profile_sticker: Mapped[str] = mapped_column(String(20), default="star", server_default="star")
     theme: Mapped[str] = mapped_column(String(30), default="acid-lime", server_default="acid-lime")
     skin: Mapped[str] = mapped_column(String(30), default="calm", server_default="calm", nullable=False)
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

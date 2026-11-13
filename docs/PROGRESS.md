@@ -6,6 +6,17 @@ This file is the pick-up point for anyone (human or AI) continuing the build. Re
 [fmlcore-vision.md](fmlcore-vision.md) for product intent and [../CHANGELOG.md](../CHANGELOG.md)
 for the per-version log.
 
+## Local admin activity and comments — 13 November 2026
+
+Migration `20261113_0921` adds the admin-only Last active timestamp. It starts
+empty and is refreshed at most once every 15 minutes per account on eligible
+signed-in browsing and actions. Writes run after the response and are skipped
+under contention. The console reads the timestamp with its existing user data.
+
+Account details list existing comments and replies, including anonymous ones,
+with pagination and links to public conversations. The About page links to
+Instagram @_fmlcore.
+
 ## Local comment conversations — 13 November 2026
 
 Posts and confessions support independent top-level conversations and replies to

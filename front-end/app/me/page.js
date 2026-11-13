@@ -1,7 +1,5 @@
 "use client";
 
-import { useSession } from "../../lib/session";
-
 const platformFacts = [
   { label: "Made for", value: "Real life, in all its weirdness" },
   { label: "The point", value: "Relatability over likes and followers" },
@@ -9,8 +7,6 @@ const platformFacts = [
 ];
 
 export default function MePage() {
-  const { user } = useSession();
-
   return (
     <>
       <main className="mx-auto max-w-5xl px-4 py-10 sm:py-16">
@@ -51,6 +47,7 @@ export default function MePage() {
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t-2 border-ink/20 pt-6">
           <p className="font-semibold">Come for the story. Stay because someone gets it.</p>
+          <a href="https://www.instagram.com/_fmlcore?psln=OWN0am5xbjMxb2pu" target="_blank" rel="noopener noreferrer" className="font-extrabold underline">Instagram @_fmlcore <span aria-hidden>↗</span></a>
           <a href="/explore" className="border-2 border-ink bg-coral px-5 py-3 font-extrabold text-on-brand shadow-[4px_4px_0_var(--color-shadow)] transition-transform hover:-translate-y-0.5">Explore FMLCore <span aria-hidden>↗</span></a>
         </div>
       </main>

@@ -1,5 +1,6 @@
 """Privacy boundary integration tests against migrated PostgreSQL; rolled back."""
 import asyncio
+from contextlib import nullcontext
 from datetime import datetime, timezone
 import unittest
 from unittest.mock import AsyncMock, patch
@@ -8,6 +9,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from app.activity import record_activity
 from app.db import engine, get_db
 from app.config import settings
 from app.security import make_token
@@ -99,6 +101,56 @@ class ProfileIdentityTests(unittest.TestCase):
                 self.assertIsNone(second["next_cursor"])
             self.client.cookies.clear()
             self.assertEqual(self.client.get(private["image_url"]).status_code, 401)
+
+    def test_last_active_write_is_throttled_by_the_database(self):
+        self.assertIsNone(self.b.last_active_at)
+        with patch("app.activity.SessionLocal.begin", return_value=nullcontext(self.db)):
+            record_activity(self.b.id)
+            self.db.refresh(self.b)
+            first = self.b.last_active_at
+            self.assertIsNotNone(first)
+            self.db.execute(User.__table__.update().where(User.id == self.b.id)
+                            .values(last_active_at=first.replace(microsecond=0)))
+            record_activity(self.b.id)
+            self.db.refresh(self.b)
+            self.assertEqual(self.b.last_active_at, first.replace(microsecond=0))
+
+    def test_admin_comments_and_activity_are_owner_only(self):
+        self.b.last_active_at = datetime.now(timezone.utc)
+        post = Post(author_id=self.outsider.id, body="Private story", category="Life", mood="soft",
+                    surface="confession", visibility="private")
+        self.db.add(post)
+        self.db.flush()
+        root = Comment(post_id=post.id, author_id=self.b.id, body="Anonymous comment", is_anonymous=True)
+        self.db.add(root)
+        self.db.flush()
+        reply = Comment(post_id=post.id, author_id=self.b.id, parent_id=root.id, body="Reply")
+        deleted = Comment(post_id=post.id, author_id=self.b.id, body="", deleted_at=self.b.last_active_at)
+        self.db.add_all([reply, deleted])
+        self.db.flush()
+
+        path = f"/admin/users/{self.b.id}"
+        with patch.object(settings, "admin_emails", self.a.email):
+            self.assertEqual(self.client.get(path + "/comments").status_code, 401)
+            self.client.cookies.set("fml_session", make_token(self.outsider.id))
+            self.assertEqual(self.client.get(path + "/comments").status_code, 403)
+            self.client.cookies.set("fml_session", make_token(self.a.id))
+            first = self.client.get(path + "/comments", params={"limit": 1})
+            self.assertEqual(first.status_code, 200, first.text)
+            self.assertIn("no-store", first.headers["Cache-Control"])
+            page = first.json()
+            second = self.client.get(path + "/comments", params={"limit": 1, "cursor": page["next_cursor"]}).json()
+            self.assertIsNone(second["next_cursor"])
+            rows = {row["body"]: row for row in page["comments"] + second["comments"]}
+            self.assertEqual(set(rows), {"Anonymous comment", "Reply"})
+            self.assertTrue(rows["Anonymous comment"]["is_anonymous"])
+            self.assertTrue(rows["Reply"]["is_reply"])
+            self.assertEqual(rows["Reply"]["visibility"], "private")
+            detail = self.client.get(path).json()
+            self.assertEqual(detail["comments_count"], 2)
+            listing = self.client.get("/admin/users", params={"q": self.b.username}).json()["users"][0]
+            self.assertEqual(datetime.fromisoformat(detail["last_active_at"].replace("Z", "+00:00")), self.b.last_active_at)
+            self.assertEqual(datetime.fromisoformat(listing["last_active_at"].replace("Z", "+00:00")), self.b.last_active_at)
 
     def test_owner_can_delete_post_and_remove_its_queued_analysis(self):
         post = Post(author_id=self.a.id, body="Delete me", category="Life", mood="soft")

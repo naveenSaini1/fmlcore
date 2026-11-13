@@ -15,6 +15,7 @@ from app.config import UPLOAD_DIR, settings
 from app.db import get_db
 from app.limiter import limit
 from app.models import (
+    Comment,
     Post,
     SameSkyAnalysis,
     SameSkyEmbedding,
@@ -168,6 +169,7 @@ def admin_users(
                 "email": user.email,
                 "joined_at": user.created_at,
                 "last_login_at": user.last_login_at,
+                "last_active_at": user.last_active_at,
                 "posts_count": posts_count,
                 "confessions_count": confessions_count,
                 "same_sky_selected": selected,
@@ -234,6 +236,22 @@ def admin_user_detail(
     return admin_users_for_one(db, user)
 
 
+def before_cursor(statement, model, cursor):
+    if not cursor:
+        return statement
+    try:
+        stamp, _, key = cursor.partition("|")
+        before = datetime.fromisoformat(stamp)
+        before_id = uuid.UUID(key)
+        if before.tzinfo is None:
+            raise ValueError()
+    except ValueError:
+        raise HTTPException(400, "Bad cursor.") from None
+    return statement.where(
+        (model.created_at < before) | ((model.created_at == before) & (model.id < before_id))
+    )
+
+
 @router.get("/users/{user_id}/stories")
 def admin_user_stories(
     user_id: uuid.UUID,
@@ -249,16 +267,7 @@ def admin_user_stories(
         raise HTTPException(404, "User not found.")
 
     stmt = select(Post).where(Post.author_id == user_id, Post.surface == surface)
-    if cursor:
-        try:
-            stamp, _, key = cursor.partition("|")
-            before = datetime.fromisoformat(stamp)
-            before_id = uuid.UUID(key)
-            if before.tzinfo is None:
-                raise ValueError()
-        except ValueError:
-            raise HTTPException(400, "Bad cursor.") from None
-        stmt = stmt.where((Post.created_at < before) | ((Post.created_at == before) & (Post.id < before_id)))
+    stmt = before_cursor(stmt, Post, cursor)
 
     rows = db.scalars(stmt.order_by(Post.created_at.desc(), Post.id.desc()).limit(limit + 1)).all()
     page = rows[:limit]
@@ -272,6 +281,44 @@ def admin_user_stories(
             "image_url": f"/admin/stories/{post.id}/image" if post.image_file else None,
         } for post in page],
         "next_cursor": f"{page[-1].created_at.isoformat()}|{page[-1].id}" if len(rows) > limit else None,
+    }
+
+
+@router.get("/users/{user_id}/comments")
+def admin_user_comments(
+    user_id: uuid.UUID,
+    response: Response,
+    cursor: str | None = None,
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(admin_user),
+) -> dict:
+    response.headers["Cache-Control"] = "private, no-store"
+    if db.get(User, user_id) is None:
+        raise HTTPException(404, "User not found.")
+
+    statement = (
+        select(Comment, Post.surface, Post.visibility)
+        .join(Post, Comment.post_id == Post.id)
+        .where(Comment.author_id == user_id, Comment.deleted_at.is_(None))
+        .order_by(Comment.created_at.desc(), Comment.id.desc())
+        .limit(limit + 1)
+    )
+    rows = db.execute(before_cursor(statement, Comment, cursor)).all()
+    page = rows[:limit]
+    last = page[-1][0] if page else None
+    return {
+        "comments": [{
+            "id": comment.id,
+            "post_id": comment.post_id,
+            "body": comment.body,
+            "created_at": comment.created_at,
+            "is_anonymous": comment.is_anonymous,
+            "is_reply": comment.parent_id is not None,
+            "surface": surface,
+            "visibility": visibility,
+        } for comment, surface, visibility in page],
+        "next_cursor": f"{last.created_at.isoformat()}|{last.id}" if len(rows) > limit else None,
     }
 
 
@@ -587,7 +634,7 @@ def admin_match_explorer(
 
 
 def admin_users_for_one(db: Session, user: User) -> dict:
-    from app.models import Comment, Reaction, SameSkyAttempt
+    from app.models import Reaction, SameSkyAttempt
 
     profile = db.scalar(select(SameSkyProfile).where(SameSkyProfile.user_id == user.id))
     return {
@@ -596,6 +643,7 @@ def admin_users_for_one(db: Session, user: User) -> dict:
         "email": user.email,
         "joined_at": user.created_at,
         "last_login_at": user.last_login_at,
+        "last_active_at": user.last_active_at,
         "posts_count": db.scalar(select(func.count(Post.id)).where(Post.author_id == user.id, Post.surface == "feed")) or 0,
         "confessions_count": db.scalar(select(func.count(Post.id)).where(Post.author_id == user.id, Post.surface == "confession")) or 0,
         "comments_count": db.scalar(select(func.count(Comment.id)).where(Comment.author_id == user.id, Comment.deleted_at.is_(None))) or 0,

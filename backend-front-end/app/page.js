@@ -257,19 +257,20 @@ export default function AdminPage() {
 
       <section className="main-grid">
         <article className="card panel">
-          <div className="panel-head"><div><h2>People on FMLCore</h2><p className="panel-subtitle">Open an account to see activity and stories.</p></div><form onSubmit={searchUsers}><input className="search-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search username or email" aria-label="Search users"/></form></div>
+          <div className="panel-head"><div><h2>People on FMLCore</h2><p className="panel-subtitle">Open an account to see activity, stories, and comments.</p></div><form onSubmit={searchUsers}><input className="search-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search username or email" aria-label="Search users"/></form></div>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Account</th><th>Last sign-in</th><th>Posts</th><th>Confessions</th><th>Same Sky</th></tr></thead>
+              <thead><tr><th>Account</th><th>Last sign-in</th><th>Last active</th><th>Posts</th><th>Confessions</th><th>Same Sky</th></tr></thead>
               <tbody>
                 {users.map((user) => <tr key={user.id}>
                   <td><button className="user-button" onClick={() => showUser(user.id)}>{user.username}</button><span className="muted">{user.email}</span></td>
                   <td>{dateLabel(user.last_login_at)}</td>
+                  <td>{user.last_active_at ? dateLabel(user.last_active_at) : "No activity recorded"}</td>
                   <td>{user.posts_count}</td>
                   <td>{user.confessions_count}</td>
                   <td><span className={`pill ${user.same_sky_matching_enabled ? "" : "pill-off"}`}>{user.same_sky_eligibility.replaceAll("_", " ")}</span><span className="muted">{user.same_sky_ready}/{user.same_sky_selected} analyzed</span></td>
                 </tr>)}
-                {!users.length && <tr><td colSpan="5">No accounts match that search.</td></tr>}
+                {!users.length && <tr><td colSpan="6">No accounts match that search.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -277,6 +278,7 @@ export default function AdminPage() {
           {selectedUser && <section className="details" aria-live="polite"><div className="panel-head"><h3>{selectedUser.username} · account snapshot</h3><button className="btn btn-quiet" onClick={() => setSelectedUser(null)}>Close</button></div><div className="detail-grid">
             <div className="detail-item"><small>Email</small><strong>{selectedUser.email}</strong></div>
             <div className="detail-item"><small>Joined</small><strong>{dateLabel(selectedUser.joined_at)}</strong></div>
+            <div className="detail-item"><small>Last active</small><strong>{selectedUser.last_active_at ? dateLabel(selectedUser.last_active_at) : "No activity recorded"}</strong></div>
             <div className="detail-item"><small>Comments</small><strong>{selectedUser.comments_count}</strong></div>
             <div className="detail-item"><small>Reactions</small><strong>{selectedUser.reactions_count}</strong></div>
             <div className="detail-item"><small>Matching entries</small><strong>{selectedUser.same_sky_ready}/{selectedUser.same_sky_selected} ready</strong></div>

@@ -2,6 +2,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import (
+    BackgroundTasks,
     Depends,
     FastAPI,
     File,
@@ -18,6 +19,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
+from app.activity import schedule_activity
 from app.config import UPLOAD_DIR, settings
 from app.leaderboard_live import router as leaderboard_live_router
 from app.browser_push import router as browser_push_router
@@ -158,19 +160,23 @@ async def stop_live_notifications() -> None:
     await stop_notification_listener(app)
 
 
-def current_user(request: Request, db: Session = Depends(get_db)) -> User:
+def current_user(request: Request, tasks: BackgroundTasks, db: Session = Depends(get_db)) -> User:
     user = db.get(User, read_user_id(request))
     if user is None:
         raise HTTPException(status_code=401, detail="Log in again.")
+    schedule_activity(request, tasks, user.id)
     return user
 
 
-def optional_user(request: Request, db: Session = Depends(get_db)) -> User | None:
+def optional_user(request: Request, tasks: BackgroundTasks, db: Session = Depends(get_db)) -> User | None:
     try:
         user_id = read_user_id(request)
     except HTTPException:
         return None
-    return db.get(User, user_id)
+    user = db.get(User, user_id)
+    if user is not None:
+        schedule_activity(request, tasks, user.id)
+    return user
 
 
 def single_post_out(db: Session, post: Post, user: User | None) -> PostOut:
