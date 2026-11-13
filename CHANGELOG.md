@@ -5,6 +5,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased] — 2026-11-12
 
+- Show Join in guest navigation, link notifications to the story or comment,
+  and add sharing for public posts and confessions.
+- Remove the empty Confession Sky message.
+- Let authors edit story text in My posts and My confessions.
 - Use “Someone” in vote, comment, and reply notifications.
 - Remove Explore feed tabs and category and mood filters.
 - Fix post deletion when cleaning up queued Same Sky analysis.

@@ -154,6 +154,10 @@ class FeedOut(BaseModel):
     next_cursor: str | None
 
 
+class StoryEditIn(BaseModel):
+    body: str
+
+
 class ReactionIn(BaseModel):
     type: str
 

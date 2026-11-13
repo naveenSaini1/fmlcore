@@ -172,7 +172,6 @@ export default function SiteHeader({ user }) {
             </Link>
           ) : (
             <>
-              <Link href="/login" aria-current={isActive("/login") ? "page" : undefined} className={navClass(isActive("/login"))}>Log in{isActive("/login") ? <ActiveIndicator reduce={reduce} /> : null}</Link>
               <Link href="/signup" aria-current={isActive("/signup") ? "page" : undefined} className={navClass(isActive("/signup"))}>Join{isActive("/signup") ? <ActiveIndicator reduce={reduce} /> : null}</Link>
             </>
           )}
@@ -182,7 +181,7 @@ export default function SiteHeader({ user }) {
           {user ? <>
             <Link href="/same-sky" aria-label="Same Sky" title="Same Sky" aria-current={isActive("/same-sky") ? "page" : undefined}><MobileIcon name="sky" /></Link>
             <Link href="/notifications" aria-label="Notifications" title="Notifications" aria-current={isActive("/notifications") ? "page" : undefined}><MobileIcon name="notifications" /><UnreadBadge count={notificationCount} /></Link>
-          </> : <><Link href="/login">Log in</Link><Link href="/signup" className="mobile-guest-join">Join</Link></>}
+          </> : <Link href="/signup" className="mobile-guest-join">Join</Link>}
         </div>
       </div>
     </header>

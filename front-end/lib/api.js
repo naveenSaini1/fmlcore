@@ -265,6 +265,10 @@ export function reportContent({ targetType, targetId, reason, details }) {
 
 export function getMyReportedPosts() { return api("/safety/reports/mine"); }
 export function getMyPosts(surface = "feed", limit = 100) { return api(`/me/posts?surface=${encodeURIComponent(surface)}&limit=${limit}`); }
+export function editPost(id, body) {
+  return api(`/posts/${id}`, { method: "PATCH", body: JSON.stringify({ body }) });
+}
+
 export function deletePost(id) { return api(`/posts/${id}`, { method: "DELETE" }); }
 export function deleteComment(id) { return api(`/comments/${id}`, { method: "DELETE" }); }
 
@@ -305,8 +309,11 @@ export function removeReaction(postId) {
   return api(`/posts/${postId}/reaction`, { method: "DELETE" });
 }
 
-export function getComments(postId, cursor) {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+export function getComments(postId, cursor, focus) {
+  const params = new URLSearchParams();
+  if (cursor) params.set("cursor", cursor);
+  if (focus) params.set("focus", focus);
+  const query = params.size ? `?${params}` : "";
   return api(`/posts/${postId}/comments${query}`);
 }
 

@@ -17,6 +17,15 @@ function notificationCopy(item) {
   return "Someone commented on your post.";
 }
 
+function notificationLink(item) {
+  if (item.kind.startsWith("same_sky_")) return { href: "/same-sky", label: "Open Same Sky" };
+  if (!item.post_id) return null;
+  const post = `/posts/${item.post_id}`;
+  return item.comment_id
+    ? { href: `${post}?comment=${item.comment_id}#comment-${item.comment_id}`, label: "Open comment" }
+    : { href: post, label: "Open story" };
+}
+
 export default function NotificationsPage() {
   const { user, ready } = useSession();
   const [items, setItems] = useState([]);
@@ -103,7 +112,9 @@ export default function NotificationsPage() {
           </div>
         ) : null}
         <div className="space-y-3">
-          {items.map((item) => (
+          {items.map((item) => {
+            const link = notificationLink(item);
+            return (
             <article key={item.id} className={`notification-card border-4 border-ink p-4 ${item.is_read ? "bg-white" : "bg-purple text-on-brand"}`}>
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -113,11 +124,12 @@ export default function NotificationsPage() {
                 {!item.is_read ? <span className="mt-1 h-3 w-3 shrink-0 border-2 border-ink bg-lime" aria-label="Unread" /> : null}
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-4 text-sm font-extrabold">
-                <Link href={item.kind.startsWith("same_sky_") ? "/same-sky" : "/"} className="underline">{item.kind.startsWith("same_sky_") ? "Open Same Sky" : "Open the feed"}</Link>
+                {link && <Link href={link.href} onClick={() => { if (!item.is_read) void markOne(item.id); }} className="underline">{link.label}</Link>}
                 {!item.is_read ? <button type="button" onClick={() => markOne(item.id)} className="underline">Mark read</button> : null}
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
         {cursor ? <button type="button" onClick={() => load(cursor, true)} className="mt-4 w-full border-4 border-ink bg-white px-4 py-3 font-extrabold">Load older notifications</button> : null}
       </main>

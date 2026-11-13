@@ -63,6 +63,7 @@ from app.schemas import (
     PostOut,
     ProfileIn,
     ReactionIn,
+    StoryEditIn,
     ReportIn,
     SkinIn,
     SafetyUserOut,
@@ -962,6 +963,10 @@ def leaderboard(
     return LeaderboardOut(entries=entries, next_offset=start + size if has_more else None)
 
 
+def post_is_visible(post: Post | None, viewer: User | None) -> bool:
+    return post is not None and (post.visibility == "public" or (viewer is not None and viewer.id == post.author_id))
+
+
 @app.get("/posts/{post_id}", response_model=PostOut)
 def get_post(
     post_id: uuid.UUID,
@@ -969,8 +974,31 @@ def get_post(
     user: User | None = Depends(optional_user),
 ):
     post = db.get(Post, post_id)
-    if post is None or post.author_id in hidden_author_ids(db, user.id if user else None):
+    if not post_is_visible(post, user) or post.author_id in hidden_author_ids(db, user.id if user else None):
         raise HTTPException(status_code=404, detail="That post is gone.")
+    return single_post_out(db, post, user)
+
+
+@app.patch("/posts/{post_id}", response_model=PostOut)
+def edit_post(
+    post_id: uuid.UUID,
+    body: StoryEditIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    limit(request, "post_edit", max_hits=30, window_seconds=600)
+    post = db.scalar(select(Post).where(Post.id == post_id, Post.author_id == user.id).with_for_update())
+    if post is None:
+        raise HTTPException(404, "That post is gone.")
+    content = body.body.strip()
+    if not 1 <= len(content) <= MAX_POST_BODY:
+        raise HTTPException(422, "A story must be between 1 and 1,000 characters.")
+    if post.body != content:
+        post.body = content
+        if db.get(SameSkyAnalysis, post.id) is not None:
+            include_post_for_matching(db, user, post)
+        db.commit()
     return single_post_out(db, post, user)
 
 
@@ -1038,7 +1066,7 @@ def set_reaction(
     if body.type not in REACTION_SET:
         raise HTTPException(status_code=422, detail="That is not a reaction.")
     post = db.get(Post, post_id)
-    if post is None or post.author_id in hidden_author_ids(db, user.id):
+    if not post_is_visible(post, user) or post.author_id in hidden_author_ids(db, user.id):
         raise HTTPException(status_code=404, detail="That post is gone.")
 
     existing = db.scalar(
@@ -1070,7 +1098,7 @@ def remove_reaction(
 ):
     limit(request, "reaction_remove", max_hits=60, window_seconds=60)
     post = db.get(Post, post_id)
-    if post is None or post.author_id in hidden_author_ids(db, user.id):
+    if not post_is_visible(post, user) or post.author_id in hidden_author_ids(db, user.id):
         raise HTTPException(status_code=404, detail="That post is gone.")
     existing = db.scalar(
         select(Reaction).where(Reaction.post_id == post_id, Reaction.user_id == user.id)
@@ -1086,12 +1114,13 @@ def list_comments(
     post_id: uuid.UUID,
     cursor: str | None = None,
     limit: int = 20,
+    focus: uuid.UUID | None = None,
     db: Session = Depends(get_db),
     user: User | None = Depends(optional_user),
 ):
     post = db.get(Post, post_id)
     hidden = hidden_author_ids(db, user.id if user else None)
-    if post is None or post.author_id in hidden:
+    if not post_is_visible(post, user) or post.author_id in hidden:
         raise HTTPException(status_code=404, detail="That post is gone.")
     size = max(1, min(limit, 50))
     stmt = (
@@ -1114,6 +1143,13 @@ def list_comments(
     has_more = len(tops) > size
     tops = tops[:size]
     next_cursor = tops[-1].created_at.isoformat() if has_more and tops else None
+
+    if focus and not cursor:
+        target = db.get(Comment, focus)
+        if target and target.post_id == post_id and target.author_id not in hidden:
+            root = db.get(Comment, target.parent_id) if target.parent_id else target
+            if root and root.post_id == post_id and root.author_id not in hidden and all(row.id != root.id for row in tops):
+                tops.insert(0, root)
 
     replies_by_parent: dict[uuid.UUID, list[Comment]] = {}
     top_ids = [t.id for t in tops]
@@ -1166,7 +1202,7 @@ def add_comment(
     limit(request, "comment", max_hits=30, window_seconds=600)
     post = db.get(Post, post_id)
     hidden = hidden_author_ids(db, user.id)
-    if post is None or post.author_id in hidden or relationship_blocked(db, post.author_id, user.id):
+    if not post_is_visible(post, user) or post.author_id in hidden or relationship_blocked(db, post.author_id, user.id):
         raise HTTPException(status_code=404, detail="That post is gone.")
     text = body.body.strip()
     if not 1 <= len(text) <= MAX_POST_BODY:

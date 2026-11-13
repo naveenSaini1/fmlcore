@@ -16,7 +16,7 @@ from app.chat.routes import chat_user
 from app.chat.service import get_conversation_detail, get_conversation_messages, get_user_conversations
 from app.chat.identity import anonymous_id
 from app.chat.websocket_handler import handle_chat_message_send, handle_chat_typing_start, handle_chat_typing_stop
-from app.models import User, Post, ChatConversation, ChatParticipant, Notification, UserBlock, SameSkyMatch, SameSkyJob, PostHistory
+from app.models import User, Post, ChatConversation, ChatParticipant, Notification, UserBlock, SameSkyMatch, SameSkyJob, PostHistory, Comment
 from app.same_sky_common import _match_out
 
 
@@ -119,6 +119,63 @@ class ProfileIdentityTests(unittest.TestCase):
         self.assertIsNone(self.db.get(SameSkyJob, queued_id))
         self.assertIsNotNone(self.db.get(SameSkyJob, unrelated_id))
         self.assertIsNotNone(self.db.scalar(select(PostHistory).where(PostHistory.original_id == post_id)))
+
+    def test_story_link_resolves_older_reply_and_enforces_privacy(self):
+        from datetime import timedelta
+
+        public = Post(author_id=self.b.id, body="Shared", category="Life", mood="soft", is_anonymous=True)
+        private = Post(author_id=self.b.id, body="Private", category="Life", mood="soft", visibility="private")
+        self.db.add_all([public, private])
+        self.db.flush()
+        now = datetime.now(timezone.utc)
+        root = Comment(post_id=public.id, author_id=self.b.id, body="Older", created_at=now - timedelta(days=1))
+        newest = Comment(post_id=public.id, author_id=self.a.id, body="Newest", created_at=now)
+        self.db.add_all([root, newest])
+        self.db.flush()
+        reply = Comment(post_id=public.id, author_id=self.a.id, parent_id=root.id, body="Linked reply")
+        self.db.add(reply)
+        self.db.flush()
+
+        story = self.client.get(f"/posts/{public.id}")
+        self.assertEqual(story.status_code, 200)
+        self.assertIsNone(story.json()["author"])
+        response = self.client.get(f"/posts/{public.id}/comments", params={"focus": str(reply.id), "limit": 1})
+        self.assertEqual(response.status_code, 200, response.text)
+        rows = response.json()["comments"]
+        self.assertEqual(rows[0]["id"], str(root.id))
+        self.assertEqual(rows[0]["replies"][0]["id"], str(reply.id))
+        self.assertEqual(self.client.get(f"/posts/{private.id}").status_code, 404)
+        self.assertEqual(self.client.get(f"/posts/{private.id}/comments").status_code, 404)
+        self.viewer = self.b
+        self.assertEqual(self.client.get(f"/posts/{private.id}").status_code, 200)
+
+    def test_only_author_can_edit_posts_and_confessions(self):
+        from app.same_sky_api import include_post_for_matching
+
+        app.dependency_overrides[current_user] = lambda: self.viewer
+        for surface in ("feed", "confession"):
+            post = Post(author_id=self.b.id, body="Original", category="Life", mood="soft",
+                        surface=surface, visibility="private", is_anonymous=True)
+            self.db.add(post)
+            self.db.flush()
+            analysis = include_post_for_matching(self.db, self.b, post)
+            fingerprint = analysis.analysis_fingerprint
+            path = f"/posts/{post.id}"
+            self.viewer = self.a
+            self.assertEqual(self.client.patch(path, json={"body": "Other account"}).status_code, 404)
+            self.viewer = self.b
+            self.assertEqual(self.client.patch(path, json={"body": "  "}).status_code, 422)
+            result = self.client.patch(path, json={"body": " Updated text "})
+            self.assertEqual(result.status_code, 200, result.text)
+            self.assertEqual(result.json()["body"], "Updated text")
+            self.assertEqual(result.json()["visibility"], "private")
+            self.assertTrue(result.json()["is_anonymous"])
+            self.assertNotEqual(analysis.analysis_fingerprint, fingerprint)
+            jobs = self.db.scalars(select(SameSkyJob).where(
+                SameSkyJob.payload["post_id"].as_string() == str(post.id),
+                SameSkyJob.status == "queued",
+            )).all()
+            self.assertEqual(len(jobs), 1)
 
     def test_nickname_one_sided_reveal_and_withdrawal(self):
         path=f'/chat/conversations/{self.conv.id}'

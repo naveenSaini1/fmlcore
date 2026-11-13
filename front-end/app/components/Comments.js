@@ -69,7 +69,7 @@ function ReplyForm({ onSubmit, pending }) {
   );
 }
 
-function CommentItem({ postId, comment, onReplyAdded, viewerId, onHideUser, hiddenAuthors }) {
+function CommentItem({ postId, comment, onReplyAdded, viewerId, onHideUser, hiddenAuthors, focusComment }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -97,7 +97,7 @@ function CommentItem({ postId, comment, onReplyAdded, viewerId, onHideUser, hidd
   }
 
   return (
-    <div className="border-2 border-ink bg-white p-3">
+    <div id={`comment-${comment.id}`} className={`scroll-mt-24 border-2 border-ink bg-white p-3 ${focusComment === comment.id ? "ring-2 ring-coral" : ""}`}>
       <Identity comment={comment} />
       <p className="mt-2 whitespace-pre-wrap break-words text-sm font-semibold">{comment.body}</p>
       <button
@@ -114,7 +114,7 @@ function CommentItem({ postId, comment, onReplyAdded, viewerId, onHideUser, hidd
       {comment.replies?.length ? (
         <div className="mt-3 space-y-2 border-l-4 border-ink pl-3">
           {comment.replies.filter((reply) => !hiddenAuthors.has(reply.author?.id)).map((reply) => (
-            <div key={reply.id}>
+            <div key={reply.id} id={`comment-${reply.id}`} className={`scroll-mt-24 ${focusComment === reply.id ? "ring-2 ring-coral" : ""}`}>
               <Identity comment={reply} />
               <p className="mt-1 whitespace-pre-wrap break-words text-sm font-semibold">{reply.body}</p>
               {reply.is_mine ? <button type="button" disabled={deleting} onClick={() => removeComment(reply.id)} className="mt-1 text-xs font-extrabold text-ink/60 underline disabled:opacity-50">{deleting ? "Deleting…" : "Delete"}</button> : null}
@@ -126,7 +126,7 @@ function CommentItem({ postId, comment, onReplyAdded, viewerId, onHideUser, hidd
   );
 }
 
-export default function Comments({ post, onCountChange, viewerId }) {
+export default function Comments({ post, onCountChange, viewerId, focusComment }) {
   const [comments, setComments] = useState([]);
   const [cursor, setCursor] = useState(null);
   const [status, setStatus] = useState("loading");
@@ -143,8 +143,8 @@ export default function Comments({ post, onCountChange, viewerId }) {
 
   async function load(initial) {
     try {
-      const data = await getComments(post.id, initial ? null : cursor);
-      setComments((prev) => (initial ? data.comments : [...prev, ...data.comments]));
+      const data = await getComments(post.id, initial ? null : cursor, initial ? focusComment : null);
+      setComments((prev) => (initial ? data.comments : [...new Map([...prev, ...data.comments].map(comment => [comment.id, comment])).values()]));
       setCursor(data.next_cursor);
       setStatus("ready");
     } catch (err) {
@@ -157,6 +157,12 @@ export default function Comments({ post, onCountChange, viewerId }) {
     load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (status === "ready" && focusComment) {
+      document.getElementById(`comment-${focusComment}`)?.scrollIntoView({ block: "center" });
+    }
+  }, [status, focusComment]);
 
   useEffect(() => {
     const onDeleted = (event) => {
@@ -248,7 +254,7 @@ export default function Comments({ post, onCountChange, viewerId }) {
       <div className="mt-3 space-y-3">
         {comments.map((comment) => (
           !hiddenAuthors.has(comment.author?.id) ? (
-            <CommentItem key={comment.id} postId={post.id} comment={comment} onReplyAdded={onReplyAdded} viewerId={viewerId} onHideUser={hideAuthor} hiddenAuthors={hiddenAuthors} />
+            <CommentItem key={comment.id} postId={post.id} comment={comment} onReplyAdded={onReplyAdded} viewerId={viewerId} onHideUser={hideAuthor} hiddenAuthors={hiddenAuthors} focusComment={focusComment} />
           ) : null
         ))}
       </div>

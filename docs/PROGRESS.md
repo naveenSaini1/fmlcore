@@ -6,6 +6,14 @@ This file is the pick-up point for anyone (human or AI) continuing the build. Re
 [fmlcore-vision.md](fmlcore-vision.md) for product intent and [../CHANGELOG.md](../CHANGELOG.md)
 for the per-version log.
 
+## Local story links, sharing, and edits — 13 November 2026
+
+Guest navigation shows Join. Notifications open the specific story and bring
+the referenced comment or reply into view, including older threads. Public
+posts and confessions can be shared with a story link. The Confession Sky
+empty message was removed. Authors can edit text from My posts or My
+confessions. An edit refreshes existing Same Sky analysis for that story.
+
 ## Admin user stories — 12 November 2026
 
 The admin user detail view shows all posts and confessions in separate

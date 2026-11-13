@@ -8,12 +8,15 @@ import { timeAgo } from "../../lib/format";
 import { profileColor, profileSticker } from "../../lib/profile-style";
 import ReactionBar from "./ReactionBar";
 import Comments from "./Comments";
+import ShareStory from "./ShareStory";
+import EditStory from "./EditStory";
 import { ReportAction, UserSafetyActions } from "./SafetyActions";
 
-export default function PostCard({ post: initial, index = 0, preview = false, viewerId = null, showSafety = true, onDelete, deleting = false }) {
+export default function PostCard({ post: initial, index = 0, preview = false, viewerId = null, onEdit, showSafety = true, onDelete, deleting = false, focusComment = null }) {
   const [livePost, setLivePost] = useState(initial);
   useEffect(() => setLivePost(initial), [initial]);
-  const [showComments, setShowComments] = useState(false);
+  const [showComments, setShowComments] = useState(Boolean(focusComment));
+  const [editing, setEditing] = useState(false);
   const [hiddenBySafety, setHiddenBySafety] = useState(false);
   // In preview mode the parent re-renders with fresh props each keystroke,
   // so read straight from the prop; otherwise use the card's own state.
@@ -59,12 +62,12 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
           )}
         </AuthorTag>
         <span className="post-time font-note text-xl leading-none text-ink/70">{timeAgo(post.created_at)}</span>
-        <div className="post-card-menu">{!preview && (onDelete || (viewerId && (!post.author || post.author.id !== viewerId))) ? <details className="post-actions"><summary aria-label="Post actions" title="Post actions">•••</summary><div className="post-actions-menu">{onDelete ? <button type="button" disabled={deleting} onClick={onDelete} className="block w-full border-2 border-ink bg-coral px-2 py-1 text-left text-xs font-extrabold">{deleting ? "Deleting…" : "Delete post"}</button> : <><ReportAction targetType="post" targetId={post.id} />{post.author ? <UserSafetyActions target={post.author} onHide={() => setHiddenBySafety(true)} /> : null}</>}</div></details> : null}</div>
+        <div className="post-card-menu">{!preview && (onDelete || (viewerId && (!post.author || post.author.id !== viewerId))) ? <details className="post-actions"><summary aria-label="Post actions" title="Post actions">•••</summary><div className="post-actions-menu">{onDelete ? <>{onEdit && <button type="button" onClick={event => { event.currentTarget.closest("details").open = false; setEditing(true); }} className="block w-full border-2 border-ink bg-white px-2 py-1 text-left text-xs font-extrabold">Edit {post.surface === "confession" ? "confession" : "post"}</button>}<button type="button" disabled={deleting} onClick={onDelete} className="block w-full border-2 border-ink bg-coral px-2 py-1 text-left text-xs font-extrabold">{deleting ? "Deleting…" : "Delete post"}</button></> : <><ReportAction targetType="post" targetId={post.id} />{post.author ? <UserSafetyActions target={post.author} onHide={() => setHiddenBySafety(true)} /> : null}</>}</div></details> : null}</div>
       </div>
 
-      <p className="post-body mt-3 whitespace-pre-wrap break-words text-lg font-semibold leading-snug">
+      {editing ? <EditStory post={post} onCancel={() => setEditing(false)} onSave={updated => { setLivePost(updated); onEdit(updated); setEditing(false); }} /> : <p className="post-body mt-3 whitespace-pre-wrap break-words text-lg font-semibold leading-snug">
         {post.body}
-      </p>
+      </p>}
 
       {image ? (
         <img
@@ -97,9 +100,11 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
           >
             {showComments ? "hide comments" : `comments (${post.comment_count})`}
           </button>
+          {post.visibility === "public" && <ShareStory post={post} />}
           {showComments ? (
             <Comments
               post={post}
+              focusComment={focusComment}
               viewerId={viewerId}
               onCountChange={(delta) =>
                 setLivePost((p) => ({ ...p, comment_count: p.comment_count + delta }))
