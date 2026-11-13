@@ -6,6 +6,14 @@ This file is the pick-up point for anyone (human or AI) continuing the build. Re
 [fmlcore-vision.md](fmlcore-vision.md) for product intent and [../CHANGELOG.md](../CHANGELOG.md)
 for the per-version log.
 
+## Local story engagement icons — 13 November 2026
+
+Posts and confessions show comment and share icons with counts. Comments
+close on an outside click or Escape. Successful sharing shows a checkmark.
+Migration 0918 stores share counts, starting at zero for existing stories.
+Migration 0919 counts each signed-in account once per story and resets old
+click totals, which cannot be attributed to accounts. Guests can share links.
+
 ## Local story links, sharing, and edits — 13 November 2026
 
 Guest navigation shows Join. Notifications open the specific story and bring

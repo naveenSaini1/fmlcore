@@ -92,12 +92,20 @@ class Post(Base):
     surface: Mapped[str] = mapped_column(String(20), default="feed", server_default="feed", index=True)
     visibility: Mapped[str] = mapped_column(String(20), default="public", server_default="public", index=True)
     balloon_color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    share_count: Mapped[int] = mapped_column(default=0, server_default="0", nullable=False)
     view_count: Mapped[int] = mapped_column(default=0, server_default="0", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
 
     author: Mapped["User"] = relationship("User")
+
+
+class StoryShare(Base):
+    __tablename__ = "story_shares"
+
+    post_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("posts.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
 
 
 class Reaction(Base):

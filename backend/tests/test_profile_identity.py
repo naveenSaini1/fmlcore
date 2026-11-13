@@ -149,6 +149,22 @@ class ProfileIdentityTests(unittest.TestCase):
         self.viewer = self.b
         self.assertEqual(self.client.get(f"/posts/{private.id}").status_code, 200)
 
+    def test_share_count_counts_distinct_signed_in_users_per_public_story(self):
+        for surface in ("feed", "confession"):
+            story = Post(author_id=self.b.id, body="Share test", category="Life", mood="soft", surface=surface)
+            self.db.add(story)
+            self.db.flush()
+            path = f"/posts/{story.id}"
+            for viewer, count in ((None, 0), (self.a, 1), (self.a, 1), (self.outsider, 2), (self.outsider, 2)):
+                self.viewer = viewer
+                response = self.client.post(path + "/share")
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(response.json()["share_count"], count)
+            self.assertEqual(self.client.get(path).json()["share_count"], 2)
+            story.visibility = "private"
+            self.db.flush()
+            self.assertEqual(self.client.post(path + "/share").status_code, 404)
+
     def test_only_author_can_edit_posts_and_confessions(self):
         from app.same_sky_api import include_post_for_matching
 

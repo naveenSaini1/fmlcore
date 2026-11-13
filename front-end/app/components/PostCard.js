@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { mediaUrl } from "../../lib/api";
 import { categoryAccent, moodByKey } from "../../lib/taxonomy";
 import { timeAgo } from "../../lib/format";
@@ -16,6 +16,29 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
   const [livePost, setLivePost] = useState(initial);
   useEffect(() => setLivePost(initial), [initial]);
   const [showComments, setShowComments] = useState(Boolean(focusComment));
+  const commentButton = useRef(null);
+  const commentPanel = useRef(null);
+  const panelId = useId();
+  useEffect(() => {
+    if (!showComments) return;
+    function closeOutside(event) {
+      if (!commentButton.current?.contains(event.target) && !commentPanel.current?.contains(event.target)) {
+        setShowComments(false);
+      }
+    }
+    function closeOnEscape(event) {
+      if (event.key === "Escape") {
+        setShowComments(false);
+        if (commentPanel.current?.contains(document.activeElement)) commentButton.current?.focus();
+      }
+    }
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [showComments]);
   const [editing, setEditing] = useState(false);
   const [hiddenBySafety, setHiddenBySafety] = useState(false);
   // In preview mode the parent re-renders with fresh props each keystroke,
@@ -93,24 +116,33 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
       {!preview ? (
         <div className="post-interactions mt-4 border-t-2 border-dashed border-ink/40 pt-4">
           <ReactionBar post={post} onChange={setLivePost} />
-          <button
-            type="button"
-            onClick={() => setShowComments((v) => !v)}
-            className="post-comments-toggle mt-3 text-sm font-extrabold underline"
-          >
-            {showComments ? "hide comments" : `comments (${post.comment_count})`}
-          </button>
-          {post.visibility === "public" && <ShareStory post={post} />}
-          {showComments ? (
-            <Comments
+          <div className="post-engagement">
+            <button
+              ref={commentButton}
+              type="button"
+              onClick={() => setShowComments(open => !open)}
+              aria-expanded={showComments}
+              aria-controls={panelId}
+              aria-label={`${showComments ? "Hide" : "Show"} comments (${post.comment_count})`}
+              className="post-engagement-button"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l1.7-3.4A8.5 8.5 0 1 1 21 11.5Z" />
+              </svg>
+              <span aria-hidden="true">{post.comment_count}</span>
+            </button>
+            {post.visibility === "public" && <ShareStory post={post} onCount={share_count => setLivePost(current => ({ ...current, share_count }))} />}
+          </div>
+          <div id={panelId} ref={commentPanel} hidden={!showComments}>
+            {showComments && <Comments
               post={post}
               focusComment={focusComment}
               viewerId={viewerId}
               onCountChange={(delta) =>
                 setLivePost((p) => ({ ...p, comment_count: p.comment_count + delta }))
               }
-            />
-          ) : null}
+            />}
+          </div>
         </div>
       ) : null}
     </article>

@@ -5,6 +5,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased] — 2026-11-12
 
+- Count each signed-in account once per shared story.
+- Show comment and share icons with counts. Close comments on outside clicks
+  and indicate successful sharing with a checkmark.
 - Show Join in guest navigation, link notifications to the story or comment,
   and add sharing for public posts and confessions.
 - Remove the empty Confession Sky message.

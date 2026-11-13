@@ -140,6 +140,7 @@ class PostOut(BaseModel):
     surface: str = "feed"
     visibility: str = "public"
     balloon_color: str | None = None
+    share_count: int = 0
     view_count: int = 0
     author: AuthorOut | None
     reactions: dict[str, int] = {}

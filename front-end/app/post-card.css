@@ -18,9 +18,21 @@ html[data-skin] .post-card .post-mood .text-lg { font-size: 14px; }
 html[data-skin] .post-card .post-mood .text-xs { font-size: 10px; }
 html[data-skin] .post-card .post-interactions { margin-top: 10px; padding-top: 8px; }
 html[data-skin] .post-card .post-reactions button { padding: 6px 8px; min-height: 32px; font-size: 11px; }
-html[data-skin] .post-card .post-comments-toggle { margin-top: 6px; font-size: 12px; }
 @media (max-width: 640px) {
   html[data-skin] .post-card { padding: 12px; column-gap: 8px; }
   html[data-skin] .post-card .post-interactions { grid-column: 1 / -1; }
   html[data-skin] .post-card .post-reactions button { min-height: 40px; }
+}
+
+.post-engagement { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin-top: 6px; }
+html[data-skin] .post-card .post-engagement-button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; min-width: 44px;
+  padding: 6px; color: var(--color-ink); font-size: 13px; font-weight: 700;
+}
+.post-engagement-button svg { width: 22px; height: 22px; flex-shrink: 0; }
+html[data-skin] .post-card .post-engagement-button[aria-expanded="true"],
+html[data-skin] .post-card .post-engagement-button[data-shared="true"] {
+  color: var(--theme-on-accent, var(--color-on-brand));
+  background: var(--theme-accent, var(--color-lime));
+  border-radius: 6px;
 }

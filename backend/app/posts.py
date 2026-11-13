@@ -40,6 +40,7 @@ def post_to_public(
         surface=post.surface,
         visibility=post.visibility,
         balloon_color=post.balloon_color,
+        share_count=post.share_count,
         view_count=post.view_count,
         author=author,
         reactions=reactions,

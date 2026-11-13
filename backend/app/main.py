@@ -14,6 +14,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import delete, func, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -29,6 +30,7 @@ from app.models import (
     Notification,
     NotificationHistory,
     Post,
+    StoryShare,
     PostHistory,
     Reaction,
     ReactionHistory,
@@ -977,6 +979,35 @@ def get_post(
     if not post_is_visible(post, user) or post.author_id in hidden_author_ids(db, user.id if user else None):
         raise HTTPException(status_code=404, detail="That post is gone.")
     return single_post_out(db, post, user)
+
+
+@app.post("/posts/{post_id}/share")
+def record_post_share(
+    post_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(optional_user),
+) -> dict:
+    limit(request, "story_share", max_hits=30, window_seconds=60)
+    stmt = select(Post).where(Post.id == post_id, Post.visibility == "public")
+    hidden = hidden_author_ids(db, user.id if user else None)
+    if hidden:
+        stmt = stmt.where(Post.author_id.not_in(hidden))
+    post = db.scalar(stmt.with_for_update() if user else stmt)
+    if post is None:
+        raise HTTPException(404, "That post is gone.")
+    if user:
+        new_share = db.scalar(
+            insert(StoryShare).values(post_id=post_id, user_id=user.id)
+            .on_conflict_do_nothing(index_elements=["post_id", "user_id"])
+            .returning(StoryShare.post_id)
+        )
+        if new_share is not None:
+            post.share_count += 1
+        count = post.share_count
+        db.commit()
+        return {"share_count": count}
+    return {"share_count": post.share_count}
 
 
 @app.patch("/posts/{post_id}", response_model=PostOut)
