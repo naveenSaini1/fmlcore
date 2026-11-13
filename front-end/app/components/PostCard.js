@@ -114,11 +114,12 @@ export default function PostCard({ post: initial, index = 0, preview = false, vi
           </div>
           <div id={panelId} hidden={!showComments}>
             {showComments && <Comments
+              key={`${post.id}:${viewerId ?? "guest"}`}
               post={post}
               focusComment={focusComment}
               viewerId={viewerId}
-              onCountChange={(delta) =>
-                setLivePost((p) => ({ ...p, comment_count: p.comment_count + delta }))
+              onCountChange={(comment_count) =>
+                setLivePost((p) => p.id !== post.id || p.comment_count === comment_count ? p : { ...p, comment_count })
               }
             />}
           </div>

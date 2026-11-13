@@ -51,17 +51,33 @@ def post_to_public(
     )
 
 
-def comment_to_public(comment: Comment, replies: list[Comment] | None = None, viewer_id: UUID | None = None) -> CommentOut:
-    author = None if comment.is_anonymous else _author_out(comment.author)
+def comment_display_name(comment: Comment, aliases: dict[UUID, int]) -> str:
+    if comment.deleted_at:
+        return "Deleted comment"
+    if comment.is_anonymous:
+        number = aliases.get(comment.author_id)
+        return f"Anonymous #{number}" if number is not None else "Anonymous"
+    return f"@{comment.author.username}"
+
+
+def comment_to_public(
+    comment: Comment,
+    viewer_id: UUID | None,
+    aliases: dict[UUID, int],
+    parent: Comment | None = None,
+) -> CommentOut:
+    deleted = comment.deleted_at is not None
     return CommentOut(
         id=comment.id,
-        body=comment.body,
-        is_anonymous=comment.is_anonymous,
-        is_mine=viewer_id is not None and comment.author_id == viewer_id,
-        author=author,
+        body="" if deleted else comment.body,
+        is_anonymous=comment.is_anonymous and not deleted,
+        is_mine=not deleted and comment.author_id == viewer_id,
+        author=None if deleted or comment.is_anonymous else _author_out(comment.author),
+        anonymous_number=aliases.get(comment.author_id) if comment.is_anonymous and not deleted else None,
+        reply_to=comment_display_name(parent, aliases) if parent else None,
+        is_deleted=deleted,
         parent_id=comment.parent_id,
         created_at=comment.created_at,
-        replies=[comment_to_public(r, viewer_id=viewer_id) for r in (replies or [])],
     )
 
 
@@ -95,7 +111,7 @@ def comment_counts_for(db: Session, post_ids: list[UUID]) -> dict[UUID, int]:
         return {}
     rows = db.execute(
         select(Comment.post_id, func.count())
-        .where(Comment.post_id.in_(post_ids))
+        .where(Comment.post_id.in_(post_ids), Comment.deleted_at.is_(None))
         .group_by(Comment.post_id)
     ).all()
     return {post_id: count for post_id, count in rows}

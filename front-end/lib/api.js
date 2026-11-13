@@ -310,12 +310,12 @@ export function removeReaction(postId) {
   return api(`/posts/${postId}/reaction`, { method: "DELETE" });
 }
 
-export function getComments(postId, cursor, focus) {
+export function getComments(postId, cursor, focus, signal) {
   const params = new URLSearchParams();
   if (cursor) params.set("cursor", cursor);
   if (focus) params.set("focus", focus);
   const query = params.size ? `?${params}` : "";
-  return api(`/posts/${postId}/comments${query}`);
+  return api(`/posts/${postId}/comments${query}`, { signal, cache: "no-store" });
 }
 
 export function addComment(postId, { body, parentId, isAnonymous }) {

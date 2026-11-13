@@ -177,11 +177,15 @@ class CommentOut(BaseModel):
     author: AuthorOut | None
     parent_id: uuid.UUID | None
     created_at: datetime
-    replies: list["CommentOut"] = []
+    anonymous_number: int | None = None
+    reply_to: str | None = None
+    is_deleted: bool = False
+    replies: list["CommentOut"] = Field(default_factory=list)
 
 
 class CommentsOut(BaseModel):
     comments: list[CommentOut]
+    comment_count: int
     next_cursor: str | None
 
 

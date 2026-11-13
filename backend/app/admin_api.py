@@ -598,7 +598,7 @@ def admin_users_for_one(db: Session, user: User) -> dict:
         "last_login_at": user.last_login_at,
         "posts_count": db.scalar(select(func.count(Post.id)).where(Post.author_id == user.id, Post.surface == "feed")) or 0,
         "confessions_count": db.scalar(select(func.count(Post.id)).where(Post.author_id == user.id, Post.surface == "confession")) or 0,
-        "comments_count": db.scalar(select(func.count(Comment.id)).where(Comment.author_id == user.id)) or 0,
+        "comments_count": db.scalar(select(func.count(Comment.id)).where(Comment.author_id == user.id, Comment.deleted_at.is_(None))) or 0,
         "reactions_count": db.scalar(select(func.count(Reaction.id)).where(Reaction.user_id == user.id)) or 0,
         "same_sky_selected": db.scalar(select(func.count(SameSkyAnalysis.post_id)).where(SameSkyAnalysis.user_id == user.id)) or 0,
         "same_sky_ready": db.scalar(select(func.count(SameSkyAnalysis.post_id)).where(SameSkyAnalysis.user_id == user.id, SameSkyAnalysis.processing_status == "ready")) or 0,

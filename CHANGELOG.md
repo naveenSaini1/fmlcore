@@ -5,6 +5,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased] — 2026-11-12
 
+- Add independent comment conversations with nested replies, post-specific anonymous numbers, and automatic refresh.
+- Preserve replies when a parent comment is deleted.
 - Show emoji, labels, and counts in the vote summary and place category and mood above story text.
 - Soften post-card and nested-panel borders.
 - Distinguish Report story from Report account in the post menu.

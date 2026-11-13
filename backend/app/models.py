@@ -138,7 +138,18 @@ class Comment(Base):
         DateTime(timezone=True), server_default=func.now(), index=True
     )
 
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     author: Mapped["User"] = relationship("User")
+
+
+class CommentAnonymousIdentity(Base):
+    __tablename__ = "comment_anonymous_identities"
+    __table_args__ = (UniqueConstraint("post_id", "number"),)
+
+    post_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("posts.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    number: Mapped[int]
 
 
 class Notification(Base):

@@ -149,6 +149,72 @@ class ProfileIdentityTests(unittest.TestCase):
         self.viewer = self.b
         self.assertEqual(self.client.get(f"/posts/{private.id}").status_code, 200)
 
+    def test_comment_conversations_keep_post_scoped_aliases_and_deep_replies(self):
+        post = Post(author_id=self.b.id, body="Conversations", category="Life", mood="soft")
+        other = Post(author_id=self.b.id, body="Another post", category="Life", mood="soft", surface="confession")
+        self.db.add_all([post, other])
+        self.db.flush()
+        app.dependency_overrides[current_user] = lambda: self.viewer
+        path = f"/posts/{post.id}/comments"
+        other_path = f"/posts/{other.id}/comments"
+
+        def add(viewer, path, body, parent=None, anonymous=True):
+            self.viewer = viewer
+            response = self.client.post(path, json={"body": body, "parent_id": parent, "is_anonymous": anonymous})
+            self.assertEqual(response.status_code, 200, response.text)
+            return response.json()
+
+        root = add(self.a, path, "First conversation")
+        reply = add(self.b, path, "First reply", root["id"])
+        nested = add(self.a, path, "Nested reply", reply["id"])
+        deep = add(self.outsider, path, "Deep reply", nested["id"], anonymous=False)
+        separate = add(self.b, path, "Independent conversation")
+        self.assertEqual([row["anonymous_number"] for row in (root, reply, nested, separate)], [1, 2, 1, 2])
+        self.assertEqual(nested["reply_to"], "Anonymous #2")
+        self.assertEqual(deep["reply_to"], "Anonymous #1")
+        self.assertEqual(add(self.b, other_path, "First here")["anonymous_number"], 1)
+        self.assertEqual(add(self.a, other_path, "Second here")["anonymous_number"], 2)
+        self.assertEqual(self.client.post(other_path, json={"body": "Cross-post reply", "parent_id": nested["id"]}).status_code, 404)
+
+        # Equal timestamps still paginate each conversation exactly once.
+        stamp = datetime.now(timezone.utc)
+        for row in self.db.scalars(select(Comment).where(Comment.post_id == post.id)):
+            row.created_at = stamp
+        self.db.flush()
+        first_page = self.client.get(path, params={"limit": 1}).json()
+        next_page = self.client.get(path, params={"limit": 1, "cursor": first_page["next_cursor"]}).json()
+        self.assertEqual({first_page["comments"][0]["id"], next_page["comments"][0]["id"]}, {root["id"], separate["id"]})
+        self.assertIsNone(next_page["next_cursor"])
+
+        self.viewer = None
+        focused = self.client.get(path, params={"focus": deep["id"], "limit": 1}).json()["comments"][0]
+        self.assertEqual(focused["id"], root["id"])
+        self.assertEqual([row["id"] for row in focused["replies"]], [reply["id"], nested["id"], deep["id"]])
+        for row in [focused, *focused["replies"][:2]]:
+            self.assertIsNone(row["author"])
+            self.assertFalse(row["is_mine"])
+        notice = self.db.scalar(select(Notification).where(Notification.comment_id == uuid.UUID(deep["id"])))
+        self.assertEqual(notice.recipient_id, self.a.id)
+
+        self.viewer = self.b
+        self.assertEqual(self.client.delete(f"/comments/{reply['id']}").status_code, 200)
+        self.viewer = self.a
+        self.assertEqual(self.client.delete(f"/comments/{root['id']}").status_code, 200)
+        data = self.client.get(path, params={"focus": deep["id"]}).json()
+        retained = next(row for row in data["comments"] if row["id"] == root["id"])
+        self.assertTrue(retained["is_deleted"])
+        self.assertEqual(retained["body"], "")
+        self.assertIsNone(retained["anonymous_number"])
+        self.assertEqual(retained["replies"][1]["reply_to"], "Deleted comment")
+        self.assertEqual(retained["replies"][2]["id"], deep["id"])
+        self.assertEqual(data["comment_count"], 3)
+        self.assertEqual(self.client.get(f"/posts/{post.id}").json()["comment_count"], 3)
+        self.assertEqual(add(self.a, path, "Still number one")["anonymous_number"], 1)
+
+        self.viewer = self.b
+        self.assertEqual(self.client.delete(f"/posts/{post.id}").status_code, 200)
+        self.assertEqual(self.client.get(path).status_code, 404)
+
     def test_share_count_counts_distinct_signed_in_users_per_public_story(self):
         for surface in ("feed", "confession"):
             story = Post(author_id=self.b.id, body="Share test", category="Life", mood="soft", surface=surface)

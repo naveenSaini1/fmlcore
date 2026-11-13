@@ -27,6 +27,7 @@ from app.limiter import limit
 from app.models import (
     CommentHistory,
     Comment,
+    CommentAnonymousIdentity,
     Notification,
     NotificationHistory,
     Post,
@@ -470,6 +471,8 @@ def submit_report(
         target_author = target.author_id if target else None
     elif body.target_type == "comment":
         target = db.get(Comment, body.target_id)
+        if target and target.deleted_at:
+            target = None
         target_author = target.author_id if target else None
     else:
         target = db.get(User, body.target_id)
@@ -1048,8 +1051,6 @@ def delete_post(post_id: uuid.UUID, request: Request, db: Session = Depends(get_
         same_sky_profile = db.scalar(select(SameSkyProfile).where(SameSkyProfile.user_id == user.id).with_for_update())
     comments = list(db.scalars(select(Comment).where(Comment.post_id == post.id)))
     comment_ids = [comment.id for comment in comments]
-    if comment_ids:
-        comments.extend(db.scalars(select(Comment).where(Comment.parent_id.in_(comment_ids))).all())
     reactions = list(db.scalars(select(Reaction).where(Reaction.post_id == post.id)))
     notification_stmt = select(Notification).where(Notification.post_id == post.id)
     if comment_ids:
@@ -1060,7 +1061,7 @@ def delete_post(post_id: uuid.UUID, request: Request, db: Session = Depends(get_
     if comment_ids:
         reports.extend(db.scalars(select(Report).where(Report.target_type == "comment", Report.target_id.in_(comment_ids))).all())
     archive_records(db, PostHistory, [post], user.id)
-    archive_records(db, CommentHistory, comments, user.id)
+    archive_records(db, CommentHistory, [item for item in comments if not item.deleted_at], user.id)
     archive_records(db, ReactionHistory, reactions, user.id)
     archive_records(db, NotificationHistory, notifications, user.id)
     archive_records(db, ReportHistory, reports, user.id)
@@ -1140,6 +1141,13 @@ def remove_reaction(
     return single_post_out(db, post, user)
 
 
+def comment_aliases(db: Session, post_id: uuid.UUID) -> dict[uuid.UUID, int]:
+    return dict(db.execute(
+        select(CommentAnonymousIdentity.user_id, CommentAnonymousIdentity.number)
+        .where(CommentAnonymousIdentity.post_id == post_id)
+    ).all())
+
+
 @app.get("/posts/{post_id}/comments", response_model=CommentsOut)
 def list_comments(
     post_id: uuid.UUID,
@@ -1150,54 +1158,82 @@ def list_comments(
     user: User | None = Depends(optional_user),
 ):
     post = db.get(Post, post_id)
-    hidden = hidden_author_ids(db, user.id if user else None)
+    viewer_id = user.id if user else None
+    hidden = hidden_author_ids(db, viewer_id)
     if not post_is_visible(post, user) or post.author_id in hidden:
         raise HTTPException(status_code=404, detail="That post is gone.")
     size = max(1, min(limit, 50))
-    stmt = (
-        select(Comment)
+    results = db.execute(
+        select(Comment, CommentAnonymousIdentity.number)
         .options(joinedload(Comment.author))
-        .where(Comment.post_id == post_id, Comment.parent_id.is_(None))
-        .order_by(Comment.created_at.desc(), Comment.id.desc())
-        .limit(size + 1)
-    )
-    if hidden:
-        stmt = stmt.where(Comment.author_id.not_in(hidden))
+        .outerjoin(CommentAnonymousIdentity, (
+            (CommentAnonymousIdentity.post_id == Comment.post_id)
+            & (CommentAnonymousIdentity.user_id == Comment.author_id)
+            & Comment.is_anonymous
+        ))
+        .where(Comment.post_id == post_id)
+        .order_by(Comment.created_at, Comment.id)
+    ).all()
+    rows = [row for row, _ in results]
+    aliases = {row.author_id: number for row, number in results if number is not None}
+    by_id = {row.id: row for row in rows}
+    children: dict[uuid.UUID | None, list[Comment]] = {}
+    for row in rows:
+        if row.author_id not in hidden or row.deleted_at:
+            children.setdefault(row.parent_id, []).append(row)
+
+    # Keep deleted nodes only where they connect readers to a visible reply.
+    threads = {}
+    for root in reversed(children.get(None, [])):
+        stack = [(root, False)]
+        visible = set()
+        ordered = []
+        while stack:
+            row, visited = stack.pop()
+            if not visited:
+                ordered.append(row)
+                stack.append((row, True))
+                stack.extend((child, False) for child in reversed(children.get(row.id, [])))
+            elif not row.deleted_at or any(child.id in visible for child in children.get(row.id, [])):
+                visible.add(row.id)
+        if root.id in visible:
+            threads[root.id] = [row for row in ordered if row.id in visible]
+
+    roots = [by_id[root_id] for root_id in threads]
     if cursor:
         try:
-            before = datetime.fromisoformat(cursor)
+            stamp, separator, row_id = cursor.partition("|")
+            before = datetime.fromisoformat(stamp)
+            if before.tzinfo is None:
+                before = before.replace(tzinfo=timezone.utc)
+            if separator:
+                boundary = (before, uuid.UUID(row_id))
+                roots = [row for row in roots if (row.created_at, row.id) < boundary]
+            else:
+                roots = [row for row in roots if row.created_at < before]
         except ValueError:
             raise HTTPException(status_code=400, detail="Bad cursor.")
-        stmt = stmt.where(Comment.created_at < before)
-
-    tops = db.scalars(stmt).all()
-    has_more = len(tops) > size
-    tops = tops[:size]
-    next_cursor = tops[-1].created_at.isoformat() if has_more and tops else None
-
+    page = roots[:size]
+    next_cursor = f"{page[-1].created_at.isoformat()}|{page[-1].id}" if len(roots) > size else None
     if focus and not cursor:
-        target = db.get(Comment, focus)
-        if target and target.post_id == post_id and target.author_id not in hidden:
-            root = db.get(Comment, target.parent_id) if target.parent_id else target
-            if root and root.post_id == post_id and root.author_id not in hidden and all(row.id != root.id for row in tops):
-                tops.insert(0, root)
+        focused = next((rows[0] for rows in threads.values() if any(row.id == focus for row in rows)), None)
+        if focused and focused not in page:
+            page.insert(0, focused)
 
-    replies_by_parent: dict[uuid.UUID, list[Comment]] = {}
-    top_ids = [t.id for t in tops]
-    if top_ids:
-        reply_rows = db.scalars(
-            select(Comment)
-            .options(joinedload(Comment.author))
-            .where(Comment.parent_id.in_(top_ids))
-            .order_by(Comment.created_at.asc(), Comment.id.asc())
-        ).all()
-        for reply in reply_rows:
-            if reply.author_id in hidden:
-                continue
-            replies_by_parent.setdefault(reply.parent_id, []).append(reply)
-
-    comments = [comment_to_public(t, replies_by_parent.get(t.id, []), user.id if user else None) for t in tops]
-    return CommentsOut(comments=comments, next_cursor=next_cursor)
+    comments = []
+    for root in page:
+        public = comment_to_public(root, viewer_id, aliases)
+        # Depth-first descendants with parent IDs avoid a nested JSON depth limit.
+        public.replies = [
+            comment_to_public(row, viewer_id, aliases, by_id[row.parent_id])
+            for row in threads[root.id][1:]
+        ]
+        comments.append(public)
+    return CommentsOut(
+        comments=comments,
+        next_cursor=next_cursor,
+        comment_count=sum(row.deleted_at is None for row in rows),
+    )
 
 
 @app.delete("/comments/{comment_id}")
@@ -1206,18 +1242,22 @@ def delete_comment(comment_id: uuid.UUID, request: Request, db: Session = Depend
     comment = db.get(Comment, comment_id)
     if comment is None or comment.author_id != user.id:
         raise HTTPException(status_code=404, detail="That comment is gone.")
-    comments = [comment]
-    if comment.parent_id is None:
-        comments.extend(db.scalars(select(Comment).where(Comment.parent_id == comment.id)).all())
-    comment_ids = [item.id for item in comments]
-    notifications = list(db.scalars(select(Notification).where(Notification.comment_id.in_(comment_ids))))
-    reports = list(db.scalars(select(Report).where(Report.target_type == "comment", Report.target_id.in_(comment_ids))))
-    archive_records(db, CommentHistory, comments, user.id)
+    post = db.scalar(select(Post).where(Post.id == comment.post_id).with_for_update())
+    if post is None:
+        raise HTTPException(status_code=404, detail="That comment is gone.")
+    db.refresh(comment)
+    if comment.deleted_at:
+        return {"ok": True}
+
+    notifications = list(db.scalars(select(Notification).where(Notification.comment_id == comment.id)))
+    reports = list(db.scalars(select(Report).where(Report.target_type == "comment", Report.target_id == comment.id)))
+    archive_records(db, CommentHistory, [comment], user.id)
     archive_records(db, NotificationHistory, notifications, user.id)
     archive_records(db, ReportHistory, reports, user.id)
-    db.execute(delete(Notification).where(Notification.id.in_([item.id for item in notifications])))
-    db.execute(delete(Report).where(Report.id.in_([item.id for item in reports])))
-    db.execute(delete(Comment).where(Comment.id.in_(comment_ids)))
+    db.execute(delete(Notification).where(Notification.comment_id == comment.id))
+    db.execute(delete(Report).where(Report.target_type == "comment", Report.target_id == comment.id))
+    comment.deleted_at = datetime.now(timezone.utc)
+    comment.body = ""
     db.commit()
     return {"ok": True}
 
@@ -1231,7 +1271,7 @@ def add_comment(
     user: User = Depends(current_user),
 ):
     limit(request, "comment", max_hits=30, window_seconds=600)
-    post = db.get(Post, post_id)
+    post = db.scalar(select(Post).where(Post.id == post_id).with_for_update())
     hidden = hidden_author_ids(db, user.id)
     if not post_is_visible(post, user) or post.author_id in hidden or relationship_blocked(db, post.author_id, user.id):
         raise HTTPException(status_code=404, detail="That post is gone.")
@@ -1239,14 +1279,20 @@ def add_comment(
     if not 1 <= len(text) <= MAX_POST_BODY:
         raise HTTPException(status_code=422, detail=f"A comment is 1 to {MAX_POST_BODY} characters.")
 
-    if body.parent_id is not None:
-        parent = db.get(Comment, body.parent_id)
-        if parent is None or parent.post_id != post_id or parent.author_id in hidden:
+    parent = db.get(Comment, body.parent_id) if body.parent_id else None
+    if body.parent_id and (parent is None or parent.deleted_at):
+        raise HTTPException(status_code=404, detail="That comment is gone.")
+    ancestor = parent
+    while ancestor is not None:
+        if ancestor.post_id != post_id or (not ancestor.deleted_at and ancestor.author_id in hidden):
             raise HTTPException(status_code=404, detail="That comment is gone.")
-        if parent.parent_id is not None:
-            raise HTTPException(status_code=400, detail="You can only reply to a top-level comment.")
-    else:
-        parent = None
+        ancestor = db.get(Comment, ancestor.parent_id) if ancestor.parent_id else None
+
+    aliases = comment_aliases(db, post_id)
+    if body.is_anonymous and user.id not in aliases:
+        number = max(aliases.values(), default=0) + 1
+        db.add(CommentAnonymousIdentity(post_id=post_id, user_id=user.id, number=number))
+        aliases[user.id] = number
 
     comment = Comment(
         id=uuid.uuid4(),
@@ -1269,7 +1315,7 @@ def add_comment(
     )
     db.commit()
     db.refresh(comment)
-    return comment_to_public(comment, viewer_id=user.id)
+    return comment_to_public(comment, user.id, aliases, parent)
 
 
 app.mount("/media", StaticFiles(directory=UPLOAD_DIR), name="media")

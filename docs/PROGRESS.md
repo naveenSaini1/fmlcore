@@ -6,6 +6,22 @@ This file is the pick-up point for anyone (human or AI) continuing the build. Re
 [fmlcore-vision.md](fmlcore-vision.md) for product intent and [../CHANGELOG.md](../CHANGELOG.md)
 for the per-version log.
 
+## Local comment conversations — 13 November 2026
+
+Posts and confessions support independent top-level conversations and replies to
+any live comment. Replies show the immediate target. The comments API returns
+each conversation root with a depth-first list of descendants in `replies` and
+uses `parent_id` to represent the tree. Notification links can open deep replies
+inside older conversations. Open, visible comment panels refresh every five
+seconds and refresh immediately after a local write.
+
+Migration `20261113_0920` backfills stable anonymous numbers by the first
+anonymous comment from each account on a post. Deleting a comment clears it
+from the public count and preserves a placeholder wherever replies need it.
+Deploy through the standard Alembic upgrade in the
+[server runbook](SERVER_RUNBOOK.md), then verify the same anonymous number
+returns after a refresh and that a reply to a deleted parent remains visible.
+
 ## Local story engagement icons — 13 November 2026
 
 Posts and confessions show comment and share icons with counts. The comment icon toggles the thread.
