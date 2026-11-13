@@ -12,9 +12,9 @@ function notificationCopy(item) {
   if (item.kind === "same_sky_reopened") return `${actor} reopened your declined Same Sky connection. You can send a fresh request.`;
   if (item.kind === "same_sky_declined") return `${actor} declined your Same Sky connection request.`;
   if (item.kind === "same_sky_connected") return `${actor} accepted your Same Sky request. You’re connected.`;
-  if (item.kind === "reaction") return `${actor} reacted to your post.`;
-  if (item.kind === "reply") return `${actor} replied to your comment.`;
-  return `${actor} commented on your post.`;
+  if (item.kind === "reaction") return "Someone voted on your post.";
+  if (item.kind === "reply") return "Someone replied to your comment.";
+  return "Someone commented on your post.";
 }
 
 export default function NotificationsPage() {

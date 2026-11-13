@@ -5,26 +5,14 @@ import { useEffect, useState } from "react";
 import {
   getDailyPrompt,
   getExplorePosts,
-  getExploreTaxonomy,
   getRandomPost,
-  getTrending,
 } from "../../lib/api";
-import { moodByKey } from "../../lib/taxonomy";
 import PostCard from "./PostCard";
 import LeaderboardPanel from "./LeaderboardPanel";
 
-const TABS = [
-  { key: "recent", label: "Fresh stories" },
-  { key: "trending", label: "Trending" },
-  { key: "random", label: "Random story" },
-];
-
 export default function Explore({ user }) {
-  const [taxonomy, setTaxonomy] = useState({ categories: [], moods: [] });
   const [prompt, setPrompt] = useState(null);
-  const [category, setCategory] = useState("");
-  const [mood, setMood] = useState("");
-  const [mode, setMode] = useState("recent");
+  const [random, setRandom] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [posts, setPosts] = useState([]);
   const [cursor, setCursor] = useState(null);
@@ -33,11 +21,7 @@ export default function Explore({ user }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([getExploreTaxonomy(), getDailyPrompt()])
-      .then(([terms, daily]) => {
-        setTaxonomy(terms);
-        setPrompt(daily);
-      })
+    getDailyPrompt().then(setPrompt)
       .catch((err) => setError(err.message));
   }, []);
 
@@ -45,12 +29,9 @@ export default function Explore({ user }) {
     let active = true;
     setStatus("loading");
     setError("");
-    const filters = { category, mood };
-    const request = mode === "trending"
-      ? getTrending(filters).then((items) => ({ items, nextCursor: null }))
-      : mode === "random"
-        ? getRandomPost(filters).then((post) => ({ items: post ? [post] : [], nextCursor: null }))
-        : getExplorePosts(filters).then((data) => ({ items: data.posts, nextCursor: data.next_cursor }));
+    const request = random
+      ? getRandomPost().then(post => ({ items: post ? [post] : [], nextCursor: null }))
+      : getExplorePosts().then(data => ({ items: data.posts, nextCursor: data.next_cursor }));
 
     request.then(({ items, nextCursor }) => {
         if (active) {
@@ -66,13 +47,13 @@ export default function Explore({ user }) {
         }
       });
     return () => { active = false; };
-  }, [category, mood, mode, refreshKey]);
+  }, [random, refreshKey]);
 
   async function loadMore() {
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const data = await getExplorePosts({ category, mood, cursor });
+      const data = await getExplorePosts({ cursor });
       setPosts((current) => [...current, ...data.posts]);
       setCursor(data.next_cursor);
     } catch (err) {
@@ -83,7 +64,7 @@ export default function Explore({ user }) {
   }
 
   function findAnother() {
-    if (mode !== "random") setMode("random");
+    if (!random) setRandom(true);
     else setRefreshKey((key) => key + 1);
   }
 
@@ -122,48 +103,7 @@ export default function Explore({ user }) {
       </section>
 
       <section aria-label="Browse stories">
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Explore feeds">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={mode === tab.key}
-              onClick={() => setMode(tab.key)}
-              className={`border-2 border-ink px-3 py-2 text-sm font-extrabold ${mode === tab.key ? "bg-ink text-on-ink" : "bg-white"}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-          {mode === "random" ? (
-            <button type="button" onClick={findAnother} className="border-2 border-ink bg-coral px-3 py-2 text-sm font-extrabold text-on-brand">
-              Another one ↻
-            </button>
-          ) : null}
-        </div>
-
-        <div className="story-filters mt-4 flex flex-wrap items-end gap-3 border-4 border-ink bg-white p-4">
-          <label className="flex flex-col gap-1 text-xs font-extrabold uppercase tracking-wide">
-            Category
-            <select value={category} onChange={(event) => setCategory(event.target.value)} className="min-w-48 border-2 border-ink bg-paper px-3 py-2 text-sm font-bold normal-case tracking-normal">
-              <option value="">All categories</option>
-              {taxonomy.categories.map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-extrabold uppercase tracking-wide">
-            Mood
-            <select value={mood} onChange={(event) => setMood(event.target.value)} className="min-w-48 border-2 border-ink bg-paper px-3 py-2 text-sm font-bold normal-case tracking-normal">
-              <option value="">All moods</option>
-              {taxonomy.moods.map((key) => {
-                const item = moodByKey(key);
-                return <option key={key} value={key}>{item.emoji} {item.label}</option>;
-              })}
-            </select>
-          </label>
-          {(category || mood) ? (
-            <button type="button" onClick={() => { setCategory(""); setMood(""); }} className="px-2 py-2 text-sm font-extrabold underline">Clear filters</button>
-          ) : null}
-        </div>
+        {random && <button type="button" onClick={() => setRandom(false)} className="border-2 border-ink bg-white px-3 py-2 text-sm font-extrabold">Back to all stories</button>}
 
         <div className="story-list mt-6 space-y-6">
           {status === "loading" ? <p className="font-note text-3xl leading-none">looking around…</p> : null}
@@ -176,11 +116,10 @@ export default function Explore({ user }) {
           {status === "ready" && posts.length === 0 ? (
             <div className="border-4 border-dashed border-ink bg-white p-8 text-center">
               <p className="font-display text-2xl font-extrabold">No stories found in this corner.</p>
-              <p className="mt-2 font-semibold">Try another mood or category.</p>
             </div>
           ) : null}
           {posts.map((post, index) => <PostCard key={post.id} post={post} index={index} viewerId={user?.id} />)}
-          {mode === "recent" && status === "ready" && cursor ? (
+          {!random && status === "ready" && cursor ? (
             <button type="button" onClick={loadMore} disabled={loadingMore} className="w-full border-4 border-ink bg-white px-4 py-3 font-extrabold shadow-[4px_4px_0_var(--color-shadow)] disabled:opacity-60">
               {loadingMore ? "Looking…" : "Load more stories"}
             </button>

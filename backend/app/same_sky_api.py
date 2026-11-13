@@ -80,7 +80,7 @@ def _purge_post_analysis(db: Session, post_id: uuid.UUID, *, remove_record: bool
     db.execute(delete(SameSkyEmbedding).where(SameSkyEmbedding.post_id == post_id))
     db.execute(delete(SameSkyJob).where(
         SameSkyJob.job_type == "analyze_post",
-        SameSkyJob.payload["post_id"].astext == str(post_id),
+        SameSkyJob.payload["post_id"].as_string() == str(post_id),
         SameSkyJob.status == "queued",
     ))
     analysis = db.scalar(select(SameSkyAnalysis).where(SameSkyAnalysis.post_id == post_id).with_for_update())

@@ -1007,7 +1007,7 @@ def delete_post(post_id: uuid.UUID, request: Request, db: Session = Depends(get_
     archive_records(db, ReportHistory, reports, user.id)
     db.execute(delete(SameSkyJob).where(
         SameSkyJob.job_type == "analyze_post",
-        SameSkyJob.payload["post_id"].astext == str(post.id),
+        SameSkyJob.payload["post_id"].as_string() == str(post.id),
         SameSkyJob.status == "queued",
     ))
     db.execute(delete(Notification).where(Notification.id.in_([item.id for item in notifications])))

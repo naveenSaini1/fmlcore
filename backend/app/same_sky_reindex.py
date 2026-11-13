@@ -24,7 +24,7 @@ def main() -> None:
             db.execute(delete(SameSkyEmbedding).where(SameSkyEmbedding.post_id == analysis.post_id))
             db.execute(delete(SameSkyJob).where(
                 SameSkyJob.job_type == "analyze_post",
-                SameSkyJob.payload["post_id"].astext == str(analysis.post_id),
+                SameSkyJob.payload["post_id"].as_string() == str(analysis.post_id),
                 SameSkyJob.status == "queued",
             ))
             analysis.processing_status = "pending"

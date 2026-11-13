@@ -5,6 +5,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased] — 2026-11-12
 
+- Use “Someone” in vote, comment, and reply notifications.
+- Remove Explore feed tabs and category and mood filters.
+- Fix post deletion when cleaning up queued Same Sky analysis.
+
 - Use Chrome's native permission prompt on the first eligible
   interaction and removes the notification settings cards.
 - Show all posts and confessions with privacy labels when an admin opens a user’s details.

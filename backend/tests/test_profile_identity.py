@@ -6,16 +6,17 @@ from unittest.mock import AsyncMock, patch
 import uuid
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.db import engine, get_db
 from app.config import settings
 from app.security import make_token
-from app.main import app, optional_user, public_profile, public_profile_posts, notification_to_public
+from app.main import app, current_user, optional_user, public_profile, public_profile_posts, notification_to_public
 from app.chat.routes import chat_user
 from app.chat.service import get_conversation_detail, get_conversation_messages, get_user_conversations
 from app.chat.identity import anonymous_id
 from app.chat.websocket_handler import handle_chat_message_send, handle_chat_typing_start, handle_chat_typing_stop
-from app.models import User, Post, ChatConversation, ChatParticipant, Notification, UserBlock, SameSkyMatch
+from app.models import User, Post, ChatConversation, ChatParticipant, Notification, UserBlock, SameSkyMatch, SameSkyJob, PostHistory
 from app.same_sky_common import _match_out
 
 
@@ -98,6 +99,26 @@ class ProfileIdentityTests(unittest.TestCase):
                 self.assertIsNone(second["next_cursor"])
             self.client.cookies.clear()
             self.assertEqual(self.client.get(private["image_url"]).status_code, 401)
+
+    def test_owner_can_delete_post_and_remove_its_queued_analysis(self):
+        post = Post(author_id=self.a.id, body="Delete me", category="Life", mood="soft")
+        self.db.add(post)
+        self.db.flush()
+        post_id = post.id
+        queued = SameSkyJob(job_type="analyze_post", payload={"post_id": str(post_id)})
+        unrelated = SameSkyJob(job_type="analyze_post", payload={"post_id": str(uuid.uuid4())})
+        self.db.add_all([queued, unrelated])
+        self.db.flush()
+        queued_id, unrelated_id = queued.id, unrelated.id
+        app.dependency_overrides[current_user] = lambda: self.a
+
+        response = self.client.delete(f"/posts/{post_id}")
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIsNone(self.db.get(Post, post_id))
+        self.assertIsNone(self.db.get(SameSkyJob, queued_id))
+        self.assertIsNotNone(self.db.get(SameSkyJob, unrelated_id))
+        self.assertIsNotNone(self.db.scalar(select(PostHistory).where(PostHistory.original_id == post_id)))
 
     def test_nickname_one_sided_reveal_and_withdrawal(self):
         path=f'/chat/conversations/{self.conv.id}'
