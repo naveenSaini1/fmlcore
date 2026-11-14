@@ -94,7 +94,7 @@ function MobileIcon({ name, className = "mobile-nav-icon" }) {
 }
 
 function ActiveIndicator({ reduce }) {
-  return <motion.span layoutId="active-nav-indicator" className="absolute inset-x-1 bottom-0 h-1 bg-coral" transition={reduce ? { duration: 0 } : { type: "tween", duration: 0.55, ease: [0.22, 1, 0.36, 1] }} />;
+  return <motion.span aria-hidden="true" layoutId="active-nav-indicator" className="pointer-events-none absolute inset-x-1 top-full mt-2 h-[3px] bg-coral" transition={reduce ? { duration: 0 } : { type: "tween", duration: 0.55, ease: [0.22, 1, 0.36, 1] }} />;
 }
 
 function ProfileNavIcon({ avatar, className, circular = false }) {

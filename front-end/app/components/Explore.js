@@ -130,7 +130,7 @@ export default function Explore({ user, sessionReady }) {
       </section>
 
       <section aria-label="Browse stories">
-        <div className="story-list space-y-4 sm:space-y-6">
+        <div className="story-list feed-posts space-y-4 sm:space-y-6">
           {status === "loading" ? <p className="font-note text-3xl leading-none">looking around…</p> : null}
           {status === "error" ? (
             <button type="button" onClick={() => setRefreshKey((key) => key + 1)} className="border-2 border-ink bg-white px-3 py-1 font-extrabold">Try loading stories again</button>
