@@ -1,28 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { showErrorToast } from "./ErrorToast";
 import { motion, useReducedMotion } from "motion/react";
 import { OVERFLOW_REACTIONS, PRIMARY_REACTIONS, REACTIONS } from "../../lib/taxonomy";
 import { removeReaction, setReaction } from "../../lib/api";
 
-export default function ReactionBar({ post, onChange }) {
+export default function ReactionBar({ post, onChange, requireLogin }) {
+  const router = useRouter();
   const reduce = useReducedMotion();
   const [pending, setPending] = useState(false);
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState("");
   const mine = post.my_reaction;
 
   async function pick(key) {
-    if (pending) return;
+    if (pending || !requireLogin()) return;
     setPending(true);
-    setError("");
     try {
       const updated = key === mine ? await removeReaction(post.id) : await setReaction(post.id, key);
       onChange(updated);
       window.dispatchEvent(new Event("fmlcore:leaderboard-change"));
       setOpen(false);
     } catch (err) {
-      setError(err.message);
+      if (err.status === 401) router.push("/login");
+      else showErrorToast(err.message);
     } finally {
       setPending(false);
     }
@@ -93,7 +95,6 @@ export default function ReactionBar({ post, onChange }) {
         </p>
       ) : null}
 
-      {error ? <p className="mt-1 text-xs font-bold text-danger">{error}</p> : null}
     </div>
   );
 }

@@ -77,14 +77,6 @@ html[data-skin="common-ground"] .page-introduction { margin-bottom: 30px; }
 html[data-skin="common-ground"] .page-introduction > p:first-child { font-family: var(--font-body); font-size: 11px; text-transform: uppercase; letter-spacing: .14em; font-weight: 600; line-height: 1.5; color: var(--ground-muted); margin-bottom: 10px; }
 html[data-skin="common-ground"] .page-introduction > p:last-child { max-width: 56ch; font-size: 15px; line-height: 1.7; font-weight: 400; color: var(--ground-muted); }
 html[data-skin="common-ground"] .discovery-layout { gap: 36px; }
-html[data-skin="common-ground"] .discovery-prompts { gap: 14px; grid-template-columns: minmax(0, 1fr) 180px; }
-html[data-skin="common-ground"] .daily-prompt { position: relative; padding: 22px 24px; border: 1px solid var(--theme-border); border-radius: 14px; background: var(--theme-tint); color: var(--color-ink); box-shadow: none; }
-html[data-skin="common-ground"] .daily-prompt > p { font: 600 10px/1.5 var(--font-body); letter-spacing: .08em; color: var(--theme-muted); }
-html[data-skin="common-ground"] .daily-prompt h2 { font: 600 23px/1.4 var(--font-manrope); margin-top: 10px; letter-spacing: -.025em; }
-html[data-skin="common-ground"] .daily-prompt a { background: var(--theme-accent); color: var(--theme-on-accent); border: 0; border-radius: 7px; font-size: 12px; padding: 9px 13px; }
-html[data-skin="common-ground"] .random-prompt { min-width: 0; border: 1px solid var(--theme-border); background: var(--theme-tint); border-radius: 14px; padding: 22px 18px; box-shadow: none; }
-html[data-skin="common-ground"] .random-prompt p { font: 500 15px/1.6 var(--font-manrope); letter-spacing: -.01em; color: var(--theme-muted); }
-html[data-skin="common-ground"] .random-prompt button { min-height: 38px; font-size: 12px; color: var(--theme-muted); border-color: var(--theme-border); border-radius: 7px; background: var(--color-paper); }
 html[data-skin="common-ground"] [role="tablist"] { gap: 18px; border-bottom: 1px solid var(--ground-border); }
 html[data-skin="common-ground"] [role="tab"] { padding: 10px 1px 13px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; font-size: 13px; color: var(--ground-muted); box-shadow: none; }
 html[data-skin="common-ground"] [role="tab"][aria-selected="true"] { border-bottom-color: var(--theme-border); color: var(--theme-accent); }
@@ -228,10 +220,6 @@ html[data-skin="common-ground"] .chat-page form { box-shadow: none; }
   html[data-skin="common-ground"] .site-navigation nav > .relative { margin-left: 0; padding-left: 8px; }
   html[data-skin="common-ground"] .site-navigation [role="dialog"] { position: fixed; top: 150px; left: 16px; right: 16px; width: auto; max-height: 65dvh; overflow: auto; }
   html[data-skin="common-ground"] .app-content > main { padding-top: 28px; }
-  html[data-skin="common-ground"] .discovery-prompts { grid-template-columns: 1fr; }
-  html[data-skin="common-ground"] .random-prompt { flex-direction: row; align-items: center; gap: 12px; padding: 14px 18px; }
-  html[data-skin="common-ground"] .random-prompt p { font-size: 13px; }
-  html[data-skin="common-ground"] .random-prompt button { margin-top: 0; flex-shrink: 0; }
   html[data-skin="common-ground"] .post-card { padding: 20px; }
   html[data-skin="common-ground"] .post-body { font-size: 15px; }
   html[data-skin="common-ground"] .post-reactions button { min-height: 40px; }

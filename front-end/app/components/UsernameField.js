@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { checkUsername } from "../../lib/api";
 import Field, { inputClass } from "./Field";
 
-export default function UsernameField() {
+export default function UsernameField({ autoFocus = false }) {
   const [value, setValue] = useState("");
   const [status, setStatus] = useState("");
   const hint = useId();
@@ -21,7 +21,7 @@ export default function UsernameField() {
   }, [value]);
   return <div>
     <Field label="Username" note="3–20 letters, numbers, underscores">
-      <input className={inputClass} name="username" autoComplete="username" value={value} onChange={event => setValue(event.target.value)} pattern="[A-Za-z0-9_]{3,20}" minLength={3} maxLength={20} aria-describedby={hint} required />
+      <input className={inputClass} name="username" autoComplete="username" value={value} onChange={event => setValue(event.target.value)} pattern="[A-Za-z0-9_]{3,20}" minLength={3} maxLength={20} aria-describedby={hint} autoFocus={autoFocus} required />
     </Field>
     <p id={hint} role="status" className="mt-1 text-xs text-ink/70">{status}</p>
   </div>;

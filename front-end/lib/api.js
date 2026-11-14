@@ -53,7 +53,12 @@ async function fetchApi(path, options = {}) {
     credentials: "include",
   });
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    if (response.ok) throw new Error("The server returned an unexpected response. Try again.");
+  }
   if (!response.ok) {
     const error = new Error(errorMessage(data));
     error.status = response.status;
@@ -292,13 +297,13 @@ export function getPost(id) {
   return api(`/posts/${id}`);
 }
 
-export function createPost({ body, category, mood, isAnonymous, file }) {
+export function createPost({ body, category, mood, isAnonymous, files = [] }) {
   const form = new FormData();
   form.append("body", body);
   form.append("category", category);
   form.append("mood", mood);
   form.append("is_anonymous", isAnonymous ? "true" : "false");
-  if (file) form.append("file", file);
+  for (const file of files) form.append("images", file);
   return api("/posts", { method: "POST", body: form });
 }
 

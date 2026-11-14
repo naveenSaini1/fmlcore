@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import PostCard from "../../components/PostCard";
+import { useErrorToast } from "../../components/ErrorToast";
 import { getPost } from "../../../lib/api";
 import { useSession } from "../../../lib/session";
 
@@ -13,6 +14,7 @@ function Story() {
   const { user, ready } = useSession();
   const [result, setResult] = useState(null);
   const scope = `${id}:${user?.id || "guest"}`;
+  useErrorToast(result?.scope === scope ? result.error : null);
 
   useEffect(() => {
     if (!ready) return;
@@ -26,14 +28,14 @@ function Story() {
   }, [id, ready, scope]);
 
   if (result?.scope !== scope || !ready) return <p role="status">Loading story…</p>;
-  if (result.error) return <p role="alert">{result.error}</p>;
+  if (result.error) return null;
 
   return <PostCard key={`${scope}:${comment || ""}`} post={result.post} viewerId={user?.id} focusComment={comment} />;
 }
 
 export default function StoryPage() {
   return <main className="mx-auto max-w-3xl px-4 py-6">
-    <Link href="/explore" className="mb-4 inline-block text-sm font-bold underline">Back to Explore</Link>
+    <Link href="/" className="mb-4 inline-block text-sm font-bold underline">Back to Explore</Link>
     <Suspense fallback={<p role="status">Loading story…</p>}><Story /></Suspense>
   </main>;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useErrorToast } from "./ErrorToast";
 import { useState } from "react";
 import { SKINS, skinById } from "../../lib/skins";
 import { useSkin } from "./SkinProvider";
@@ -7,6 +8,7 @@ import ThemePicker from "./ThemePicker";
 
 export default function SkinStudio({ embedded = false }) {
   const { skin, chooseSkin, ready, saving, error } = useSkin();
+  useErrorToast(error);
   const [notice, setNotice] = useState("");
   const Container = embedded ? "div" : "main";
   const Heading = embedded ? "h2" : "h1";
@@ -28,7 +30,6 @@ export default function SkinStudio({ embedded = false }) {
       </button>)}
     </div>
     <p className="skin-current" role="status">{saving ? "Saving your look…" : notice || (skinById(skin).name + " · your current look")}</p>
-    {error && <p className="text-danger" role="alert">{error}</p>}
     <ThemePicker />
   </Container>;
 }

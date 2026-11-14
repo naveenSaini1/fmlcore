@@ -30,13 +30,58 @@ html[data-skin] .post-card .post-engagement-button {
   padding: 6px; color: var(--color-ink); font-size: 13px; font-weight: 700;
 }
 .post-engagement-button svg { width: 22px; height: 22px; flex-shrink: 0; }
-html[data-skin] .post-card .post-engagement-button[aria-expanded="true"],
-html[data-skin] .post-card .post-engagement-button[data-shared="true"] {
+html[data-skin] .post-card .post-engagement-button[aria-expanded="true"] {
   color: var(--theme-on-accent, var(--color-on-brand));
   background: var(--theme-accent, var(--color-lime));
   border-radius: 6px;
 }
 
-html[data-skin] .explore-page .post-card {
-  border: 1px solid var(--theme-border);
+html[data-skin] .app-content > main.explore-page {
+  max-width: 48rem;
+}
+body:has(.explore-page) {
+  background-color: color-mix(in srgb, var(--color-white) 58%, var(--color-paper));
+}
+body:has(.explore-page)::before {
+  display: none;
+}
+html[data-skin] .explore-page .story-list .post-card,
+html[data-skin] .explore-page .community-panel {
+  border: 1px solid var(--theme-border, color-mix(in srgb, var(--color-ink) 14%, transparent));
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 5%);
+}
+html[data-skin] .explore-page .story-list .post-card {
+  padding: clamp(16px, 3vw, 24px);
+}
+html[data-skin] .explore-page .post-card .post-context {
+  margin-top: 12px;
+}
+html[data-skin] .explore-page .post-card .post-body {
+  margin-top: 10px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+html[data-skin] .explore-page .post-card .post-image {
+  max-width: 38rem;
+  margin-top: 14px;
+  border: 1px solid var(--theme-border, color-mix(in srgb, var(--color-ink) 14%, transparent));
+  border-radius: 10px;
+}
+html[data-skin] .explore-page .post-card .post-interactions {
+  margin-top: 16px;
+  padding-top: 12px;
+}
+@media (max-width: 640px) {
+  html[data-skin] .explore-page .post-card :is(.post-body, .post-image, .post-context) {
+    grid-column: 1 / -1;
+  }
+}
+@media (min-width: 1024px) {
+  html[data-skin] .app-content > main.explore-page {
+    max-width: 78rem;
+  }
+  html[data-skin] .explore-page .discovery-layout {
+    grid-template-columns: minmax(0, 1fr) clamp(19rem, 26vw, 22rem);
+  }
 }

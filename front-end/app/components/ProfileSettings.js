@@ -1,5 +1,6 @@
 "use client";
 
+import { showErrorToast } from "./ErrorToast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -27,14 +28,13 @@ export default function ProfileSettings({ embedded = false, initialUser = null, 
   const [bio, setBio] = useState(initialUser?.bio || "");
   const [color, setColor] = useState(initialUser?.profile_color || "lime");
   const [sticker, setSticker] = useState(initialUser?.profile_sticker || "star");
-  const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
     if (!sessionReady) return;
     if (!user) { router.replace("/login"); return; }
-    setUsername(user.username);
+    setUsername(user.username ?? "");
     setBio(user.bio || "");
     setColor(user.profile_color || "lime");
     setSticker(user.profile_sticker || "star");
@@ -44,7 +44,6 @@ export default function ProfileSettings({ embedded = false, initialUser = null, 
 
   async function onSave(event) {
     event.preventDefault();
-    setError("");
     setSaved("");
     setPending(true);
     try {
@@ -60,7 +59,7 @@ export default function ProfileSettings({ embedded = false, initialUser = null, 
       onUserChange?.(next);
       window.dispatchEvent(new Event("fmlcore:profile-change"));
     } catch (err) {
-      setError(err.message);
+      showErrorToast(err.message);
     } finally {
       setPending(false);
     }
@@ -68,8 +67,7 @@ export default function ProfileSettings({ embedded = false, initialUser = null, 
 
   async function onAvatar(event) {
     const file = event.target.files?.[0];
-    if (!file) return;
-    setError("");
+    if (!file || pending) return;
     setSaved("");
     setPending(true);
     try {
@@ -78,7 +76,7 @@ export default function ProfileSettings({ embedded = false, initialUser = null, 
       onUserChange?.(next);
       window.dispatchEvent(new Event("fmlcore:profile-change"));
     } catch (err) {
-      setError(err.message);
+      showErrorToast(err.message);
     } finally {
       setPending(false);
       event.target.value = "";
@@ -133,7 +131,7 @@ export default function ProfileSettings({ embedded = false, initialUser = null, 
           <p className="mt-2 font-note text-2xl leading-none">joined {joinedLabel(user.joined_at)}</p>
           <label className="mt-4 block cursor-pointer border-4 border-ink bg-lime px-3 py-2 text-center text-sm font-extrabold">
             Change photo
-            <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={onAvatar} />
+            <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" disabled={pending} onChange={onAvatar} />
           </label>
         </motion.section>}
 
@@ -141,6 +139,7 @@ export default function ProfileSettings({ embedded = false, initialUser = null, 
           {embedded ? <h3 className="font-display text-2xl font-extrabold">The details that make you.</h3> : <h1 className="font-display text-4xl font-extrabold leading-none">This is you.</h1>}
           <p className="font-semibold text-ink/80">{user.email}</p>
           {embedded && <label className="home-photo-upload">Change photo<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" disabled={pending} onChange={onAvatar} /></label>}
+          <p className="text-xs text-ink/70">Profile photos can be JPG, PNG or WebP, up to 8 MB.</p>
           <Field label="Username">
             <input className={inputClass} value={username} onChange={(event) => setUsername(event.target.value)} minLength={3} maxLength={20} required />
           </Field>
@@ -173,11 +172,6 @@ export default function ProfileSettings({ embedded = false, initialUser = null, 
               ))}
             </div>
           </fieldset>
-          {error ? (
-            <p className="border-4 border-ink bg-coral px-3 py-2 font-bold text-on-brand" role="alert">
-              {error}
-            </p>
-          ) : null}
           {saved ? <p className="font-note text-3xl leading-none">{saved}</p> : null}
           <div className="flex flex-col gap-3 sm:flex-row">
             <button

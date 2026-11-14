@@ -1,34 +1,31 @@
 "use client";
 
+import { useErrorToast } from "./ErrorToast";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  getDailyPrompt,
   getExplorePosts,
-  getRandomPost,
+  mediaUrl,
 } from "../../lib/api";
+import Composer from "./Composer";
 import PostCard from "./PostCard";
 import LeaderboardPanel from "./LeaderboardPanel";
 
 const PAGE_SIZE = 5;
 
-export default function Explore({ user }) {
-  const [prompt, setPrompt] = useState(null);
-  const [random, setRandom] = useState(false);
+export default function Explore({ user, sessionReady }) {
+  const [draft, setDraft] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [posts, setPosts] = useState([]);
   const [cursor, setCursor] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [pageError, setPageError] = useState("");
+  useErrorToast(pageError);
   const sentinel = useRef(null);
   const pendingPage = useRef(null);
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    getDailyPrompt().then(setPrompt)
-      .catch((err) => setError(err.message));
-  }, []);
+  useErrorToast(error);
 
   useEffect(() => {
     let active = true;
@@ -37,14 +34,10 @@ export default function Explore({ user }) {
     setLoadingMore(false);
     setPageError("");
     setError("");
-    const request = random
-      ? getRandomPost().then(post => ({ items: post ? [post] : [], nextCursor: null }))
-      : getExplorePosts({ limit: PAGE_SIZE }).then(data => ({ items: data.posts, nextCursor: data.next_cursor }));
-
-    request.then(({ items, nextCursor }) => {
+    getExplorePosts({ limit: PAGE_SIZE }).then(data => {
         if (active) {
-          setPosts(items);
-          setCursor(nextCursor);
+          setPosts(data.posts);
+          setCursor(data.next_cursor);
           setStatus("ready");
         }
       })
@@ -58,10 +51,10 @@ export default function Explore({ user }) {
       active = false;
       pendingPage.current = null;
     };
-  }, [random, refreshKey, user?.id]);
+  }, [refreshKey, user?.id]);
 
   const loadMore = useCallback(async () => {
-    if (random || status !== "ready" || !cursor || pendingPage.current) return;
+    if (status !== "ready" || !cursor || pendingPage.current) return;
     const request = {};
     pendingPage.current = request;
     setLoadingMore(true);
@@ -79,66 +72,68 @@ export default function Explore({ user }) {
         setLoadingMore(false);
       }
     }
-  }, [random, status, cursor]);
+  }, [status, cursor]);
 
   useEffect(() => {
-    if (random || status !== "ready" || !cursor || pageError || loadingMore || !sentinel.current || typeof IntersectionObserver === "undefined") return;
+    if (status !== "ready" || !cursor || pageError || loadingMore || !sentinel.current || typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver(entries => {
       if (entries.some(entry => entry.isIntersecting)) void loadMore();
     });
     observer.observe(sentinel.current);
     return () => observer.disconnect();
-  }, [random, status, cursor, pageError, loadingMore, loadMore]);
+  }, [status, cursor, pageError, loadingMore, loadMore]);
 
-  function findAnother() {
-    if (!random) setRandom(true);
-    else setRefreshKey((key) => key + 1);
+  useEffect(() => {
+    if (!user?.id) return;
+    const initialPrompt = new URLSearchParams(window.location.search).get("prompt");
+    if (initialPrompt) setDraft({ prompt: initialPrompt });
+  }, [user?.id]);
+
+  function postCreated(post) {
+    setDraft(null);
+    setRefreshKey(key => key + 1);
+    window.dispatchEvent(new CustomEvent("fmlcore:post-created", { detail: post }));
   }
 
-  const promptHref = user && prompt ? `/?prompt=${encodeURIComponent(prompt.prompt)}` : "/signup";
+  const writeEntry = <>
+    <img className="h-11 w-11 shrink-0 border-2 border-ink bg-white object-cover sm:h-12 sm:w-12" src={mediaUrl(user?.avatar_url) || "/image/user.png"} alt="" />
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span className="font-display text-lg font-extrabold leading-tight sm:text-xl">Write a post</span>
+      <span className="text-sm font-semibold text-ink/70">What&apos;s on your mind today?</span>
+    </span>
+    <span aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center border-2 border-ink bg-ink text-on-ink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+        <path d="m13.5 6.5 4 4M4 20l4.5-1 11-11a2.8 2.8 0 0 0-4-4l-11 11L4 20Z" />
+      </svg>
+    </span>
+  </>;
+  const writeClass = "explore-write flex w-full cursor-pointer items-center gap-3 rounded-xl border border-ink/15 bg-[var(--theme-tint,var(--color-white))] p-4 text-left text-ink transition-colors hover:bg-white sm:gap-4 sm:p-5";
 
   return (
-    <main className="explore-page mx-auto max-w-6xl px-4 py-8">
-      <div className="discovery-layout grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <main className="explore-page mx-auto px-4 py-5 sm:px-6 sm:py-8">
+      <div className="discovery-layout grid gap-7">
       <div className="min-w-0">
-      <header className="page-introduction mb-7">
+      {sessionReady && !user && <header className="page-introduction mb-7 hidden sm:block">
         <p className="font-note text-3xl leading-none">take a left turn</p>
         <h1 className="font-display text-5xl font-extrabold leading-[0.9] tracking-tight md:text-6xl">
           Explore the weird.
         </h1>
         <p className="mt-3 max-w-xl text-lg font-semibold">Find a story that feels familiar, or one you never saw coming.</p>
-      </header>
+      </header>}
 
-      <section className="discovery-prompts mb-8 grid gap-4 md:grid-cols-[1fr_auto]">
-        <div className="daily-prompt border-4 border-ink bg-lime p-5 text-on-brand shadow-[6px_6px_0_var(--color-shadow)]">
-          <p className="font-display text-xs font-extrabold uppercase tracking-widest">Today&apos;s prompt · {prompt?.date ?? "…"}</p>
-          <h2 className="mt-2 font-note text-4xl leading-none">{prompt?.prompt ?? "Loading today's thought…"}</h2>
-          <Link href={promptHref} className="mt-4 inline-block border-2 border-ink bg-ink px-3 py-2 text-sm font-extrabold text-on-ink">
-            {user ? "Use this prompt" : "Join to write about it"}
-          </Link>
-        </div>
-        <div className="random-prompt flex min-w-52 flex-col justify-between border-4 border-ink bg-purple p-5 text-on-brand shadow-[6px_6px_0_var(--color-shadow)]">
-          <p className="font-note text-2xl leading-none">one story, picked at random</p>
-          <button
-            type="button"
-            onClick={findAnother}
-            className="mt-4 border-2 border-ink bg-white px-3 py-2 text-sm font-extrabold"
-          >
-            Surprise me ↗
-          </button>
-        </div>
+      <section aria-label="Write a post" className="mb-5 scroll-mt-24 sm:mb-6" id="write-post">
+        {user ? (
+          draft ? (
+            <Composer key={draft.prompt} user={user} initialPrompt={draft.prompt} focusOnOpen onClose={() => setDraft(null)} onCreated={postCreated} />
+          ) : <button type="button" onClick={() => setDraft({ prompt: "" })} className={writeClass}>{writeEntry}</button>
+        ) : <Link href="/login" className={writeClass}>{writeEntry}</Link>}
       </section>
 
       <section aria-label="Browse stories">
-        {random && <button type="button" onClick={() => setRandom(false)} className="border-2 border-ink bg-white px-3 py-2 text-sm font-extrabold">Back to all stories</button>}
-
-        <div className="story-list mt-6 space-y-6">
+        <div className="story-list space-y-4 sm:space-y-6">
           {status === "loading" ? <p className="font-note text-3xl leading-none">looking around…</p> : null}
           {status === "error" ? (
-            <div className="border-4 border-ink bg-coral p-4 font-bold text-on-brand" role="alert">
-              <p>{error}</p>
-              <button type="button" onClick={() => setRefreshKey((key) => key + 1)} className="mt-3 border-2 border-white px-3 py-1 font-extrabold">Try again</button>
-            </div>
+            <button type="button" onClick={() => setRefreshKey((key) => key + 1)} className="border-2 border-ink bg-white px-3 py-1 font-extrabold">Try loading stories again</button>
           ) : null}
           {status === "ready" && posts.length === 0 ? (
             <div className="border-4 border-dashed border-ink bg-white p-8 text-center">
@@ -146,10 +141,9 @@ export default function Explore({ user }) {
             </div>
           ) : null}
           {posts.map((post, index) => <PostCard key={post.id} post={post} index={index} viewerId={user?.id} />)}
-          {!random && status === "ready" && cursor ? (
+          {status === "ready" && cursor ? (
             <div ref={sentinel} className="min-h-px">
               {loadingMore && <p className="text-sm" role="status">Loading more stories…</p>}
-              {pageError && <p className="text-sm text-danger" role="alert">{pageError}</p>}
               {(pageError || typeof IntersectionObserver === "undefined") && !loadingMore && (
                 <button type="button" onClick={loadMore} className="border-2 border-ink bg-white px-3 py-2 text-sm font-extrabold">
                   {pageError ? "Retry loading stories" : "Load more stories"}
@@ -159,9 +153,10 @@ export default function Explore({ user }) {
           ) : null}
         </div>
       </section>
-      {user ? <p className="mt-8 text-center text-sm font-bold">Signed in as @{user.username}</p> : null}
       </div>
-      <LeaderboardPanel />
+      <div className="hidden lg:contents">
+        <LeaderboardPanel />
+      </div>
       </div>
     </main>
   );

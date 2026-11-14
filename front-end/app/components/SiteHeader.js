@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
-import { getUnreadCount } from "../../lib/api";
+import { getUnreadCount, mediaUrl } from "../../lib/api";
 import { useWebSocket } from "../../lib/websocket";
 import GuestAppearance from "./GuestAppearance";
 
@@ -79,22 +79,28 @@ function UnreadBadge({ count }) {
   return count ? <span className="nav-unread ml-1 inline-flex min-w-5 items-center justify-center border border-ink bg-coral px-1 text-[10px] font-extrabold text-on-brand">{count > 99 ? "99+" : count}</span> : null;
 }
 
-function MobileIcon({ name }) {
+function MobileIcon({ name, className = "mobile-nav-icon" }) {
   const paths = {
     home: <><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" /></>,
-    explore: <><circle cx="12" cy="12" r="9" /><path d="m16 8-2.5 5.5L8 16l2.5-5.5z" /></>,
+    profile: <><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></>,
     confession: <><path d="M8 16c-2-2-3-4-3-7a7 7 0 0 1 14 0c0 3-1 5-3 7l-4 2zM12 18c-3 3 3 3 0 6" /><path d="M8 7c0-1 .5-2 2-2" /></>,
     sky: <><path d="M7 18H6a4 4 0 0 1-1-8 7 7 0 0 1 13-2 5 5 0 0 1 0 10h-1" /><path d="m12 12 1.2 2.8L16 16l-2.8 1.2L12 20l-1.2-2.8L8 16l2.8-1.2z" /></>,
     leaderboard: <><path d="M8 3h8v5a4 4 0 0 1-8 0zM8 5H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4M12 12v6m-4 3h8m-6-3h4v3" /></>,
     about: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6m0-10v.1" /></>,
   };
-  if (name === "chat") return <ChatIcon className="mobile-nav-icon" />;
-  if (name === "notifications") return <BellIcon className="mobile-nav-icon" />;
-  return <svg className="mobile-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
+  if (name === "chat") return <ChatIcon className={className} />;
+  if (name === "notifications") return <BellIcon className={className} />;
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
 function ActiveIndicator({ reduce }) {
   return <motion.span layoutId="active-nav-indicator" className="absolute inset-x-1 bottom-0 h-1 bg-coral" transition={reduce ? { duration: 0 } : { type: "tween", duration: 0.55, ease: [0.22, 1, 0.36, 1] }} />;
+}
+
+function ProfileNavIcon({ avatar, className, circular = false }) {
+  return avatar ? (
+    <img src={avatar} alt="" className={circular ? "h-10 w-10 rounded-full object-cover" : "absolute inset-0 h-full w-full rounded-[inherit] object-cover"} />
+  ) : <MobileIcon name="profile" className={className} />;
 }
 
 export default function SiteHeader({ user }) {
@@ -102,16 +108,17 @@ export default function SiteHeader({ user }) {
   const reduce = useReducedMotion();
   const notificationCount = useNotificationUnread(Boolean(user));
   const chatCount = useChatUnread(Boolean(user));
+  const avatar = mediaUrl(user?.avatar_url);
   const isActive = (href) => href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
   const navClass = (active) => `relative border-2 border-ink px-2 py-2 shadow-[3px_3px_0_var(--color-shadow)] sm:px-3 ${active ? "bg-soft-purple text-ink" : "bg-white"}`;
 
   const mobileItems = [
     { href: "/", label: "Home", icon: "home" },
-    { href: "/explore", label: "Explore", icon: "explore" },
     { href: "/confessions", label: "Confession", icon: "confession" },
     { href: "/leaderboard", label: "Leaderboard", icon: "leaderboard" },
     ...(user ? [
       { href: "/chat", label: "Chat", icon: "chat" },
+      { href: "/your-space", label: "Your Space", icon: "profile" },
     ] : [
       { href: "/me", label: "About", icon: "about" },
     ]),
@@ -126,10 +133,6 @@ export default function SiteHeader({ user }) {
           {isActive("/") ? <ActiveIndicator reduce={reduce} /> : null}
         </Link>
         <nav className="flex items-center gap-1 text-xs font-bold sm:gap-2 sm:text-sm" aria-label="Main navigation">
-          <Link href="/explore" aria-label="Explore" aria-current={isActive("/explore") ? "page" : undefined} className={navClass(isActive("/explore"))}>
-            <span>Explore</span>
-            {isActive("/explore") ? <ActiveIndicator reduce={reduce} /> : null}
-          </Link>
           <Link href="/confessions" aria-label="Confession" aria-current={isActive("/confessions") ? "page" : undefined} className={navClass(isActive("/confessions"))}>
             <span>Confession</span>
             {isActive("/confessions") ? <ActiveIndicator reduce={reduce} /> : null}
@@ -175,6 +178,12 @@ export default function SiteHeader({ user }) {
               <Link href="/signup" aria-current={isActive("/signup") ? "page" : undefined} className={navClass(isActive("/signup"))}>Join{isActive("/signup") ? <ActiveIndicator reduce={reduce} /> : null}</Link>
             </>
           )}
+          {user && (
+            <Link href="/your-space" aria-label="Your Space" title="Your Space" aria-current={isActive("/your-space") ? "page" : undefined} className={`flex h-10 w-10 shrink-0 items-center justify-center ${navClass(isActive("/your-space"))}`}>
+              <ProfileNavIcon avatar={avatar} className="h-5 w-5 shrink-0" />
+              {isActive("/your-space") ? <ActiveIndicator reduce={reduce} /> : null}
+            </Link>
+          )}
         </nav>
         {!user && <GuestAppearance />}
         <div className="mobile-header-actions">
@@ -185,9 +194,12 @@ export default function SiteHeader({ user }) {
         </div>
       </div>
     </header>
-    <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
+    <nav className={`mobile-bottom-nav${user ? " mobile-bottom-nav--signed-in" : ""}`} aria-label="Mobile navigation">
       {mobileItems.map((item) => <Link key={item.href} href={item.href} aria-label={item.label} title={item.label} aria-current={isActive(item.href) ? "page" : undefined}>
-        <span className="mobile-nav-symbol"><MobileIcon name={item.icon} />{item.icon === "chat" && <UnreadBadge count={chatCount} />}</span>
+        <span className="mobile-nav-symbol">
+          {item.icon === "profile" ? <ProfileNavIcon avatar={avatar} className="mobile-nav-icon" circular /> : <MobileIcon name={item.icon} />}
+          {item.icon === "chat" && <UnreadBadge count={chatCount} />}
+        </span>
         <span className="sr-only">{item.label}</span>
       </Link>)}
     </nav>

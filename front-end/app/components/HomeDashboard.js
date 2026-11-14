@@ -29,7 +29,7 @@ export default function HomeDashboard({ user }) {
           <span className="home-discover-icon" aria-hidden="true">✳</span>
           <h2>A little less alone.</h2>
           <p>Someone out there has been there too.</p>
-          <Link href="/explore">Find a familiar feeling <span aria-hidden="true">↗</span></Link>
+          <Link href="/">Find a familiar feeling <span aria-hidden="true">↗</span></Link>
         </section>
         <p className="home-footnote">Your stories. Your pace. Your space.</p>
       </aside>

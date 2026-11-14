@@ -89,6 +89,8 @@ class Post(Base):
     category: Mapped[str] = mapped_column(String(40))
     mood: Mapped[str] = mapped_column(String(40))
     image_file: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    extra_image_files: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+
     is_anonymous: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     surface: Mapped[str] = mapped_column(String(20), default="feed", server_default="feed", index=True)
     visibility: Mapped[str] = mapped_column(String(20), default="public", server_default="public", index=True)
@@ -100,6 +102,10 @@ class Post(Base):
     )
 
     author: Mapped["User"] = relationship("User")
+
+    @property
+    def image_files(self) -> list[str]:
+        return [self.image_file, *(self.extra_image_files or [])] if self.image_file else []
 
 
 class StoryShare(Base):
@@ -169,6 +175,7 @@ class Notification(Base):
 
     recipient: Mapped["User"] = relationship(foreign_keys=[recipient_id])
     actor: Mapped["User | None"] = relationship(foreign_keys=[actor_id])
+    post: Mapped["Post | None"] = relationship()
 
 
 class UserBlock(Base):

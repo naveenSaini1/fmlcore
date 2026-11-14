@@ -1,5 +1,6 @@
 "use client";
 
+import { useErrorToast } from "../components/ErrorToast";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -64,6 +65,7 @@ export default function SameSkyPage() {
   const [flowStatus, setFlowStatus] = useState("idle");
   const [countdownNow, setCountdownNow] = useState(Date.now());
   const [error, setError] = useState("");
+  useErrorToast(error);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -220,7 +222,6 @@ export default function SameSkyPage() {
         <h1 className="mt-2 font-display text-4xl font-extrabold sm:text-6xl">SAME SKY</h1>
       </header>
 
-      {error ? <p role="alert" className="mt-5 border-2 border-danger bg-white p-3 font-bold text-danger">{error}</p> : null}
       {notice ? <p role="status" className="mt-5 border-2 border-ink bg-lime p-3 font-bold">{notice}</p> : null}
       {!profile?.latest_attempt ? <section className="mt-7 border-4 border-ink bg-paper p-5 shadow-[6px_6px_0_var(--color-shadow)] sm:p-7">
         <div><p className="font-note text-2xl">your story, at your pace</p><h2 className="font-display text-2xl font-extrabold">MATCHING READINESS</h2></div>

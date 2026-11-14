@@ -1,5 +1,6 @@
 "use client";
 
+import { useErrorToast } from "./ErrorToast";
 import { useEffect, useState } from "react";
 import { getSafetyLists, setBlock, setMute } from "../../lib/api";
 
@@ -7,6 +8,7 @@ export default function SafetySettings() {
   const [lists, setLists] = useState({ blocks: [], mutes: [] });
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
+  useErrorToast(error);
 
   async function load() {
     try {
@@ -61,7 +63,6 @@ export default function SafetySettings() {
         <h2 className="font-display text-2xl font-extrabold">Safety settings</h2>
         <p className="mt-1 text-sm font-semibold">Blocked and muted accounts disappear from your feed and comments.</p>
       </div>
-      {error ? <p className="border-2 border-ink bg-coral px-3 py-2 text-sm font-bold text-on-brand" role="alert">{error}</p> : null}
       {status === "loading" ? <p className="font-note text-xl">Loading…</p> : null}
       {status === "ready" ? (
         <div className="grid gap-5 md:grid-cols-2">

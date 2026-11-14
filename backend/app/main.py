@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
@@ -49,6 +50,7 @@ from app.models import (
 )
 from app.posts import (
     comment_counts_for,
+    comment_is_anonymous,
     comment_to_public,
     my_reactions_for,
     post_to_public,
@@ -92,8 +94,9 @@ from app.system_settings import default_theme
 
 AVATAR_DIR = UPLOAD_DIR / "avatars"
 POSTS_DIR = UPLOAD_DIR / "posts"
-MAX_AVATAR_BYTES = 2_000_000
+MAX_AVATAR_BYTES = 8_000_000
 MAX_POST_IMAGE_BYTES = 2_000_000
+MAX_POST_IMAGES = 4
 MAX_POST_BODY = 1000
 BALLOON_COLORS = {"pink", "purple", "lime", "coral", "blue", "yellow", "orange", "mint", "lavender"}
 AVATAR_DIR.mkdir(parents=True, exist_ok=True)
@@ -195,7 +198,13 @@ def analyze_new_post_for_matching(db: Session, post: Post, user: User) -> None:
 def notification_to_public(notification: Notification) -> NotificationOut:
     actor = None
     match_notification = notification.kind.startswith("same_sky_")
-    if notification.actor is not None and not notification.actor_anonymous and not match_notification:
+    anonymous = notification.actor_anonymous or match_notification or (
+        notification.kind in {"comment", "reply"}
+        and notification.post is not None
+        and notification.post.is_anonymous
+        and notification.actor_id == notification.post.author_id
+    )
+    if notification.actor is not None and not anonymous:
         avatar = (
             f"/media/avatars/{notification.actor.avatar_file}"
             if notification.actor.avatar_file
@@ -212,7 +221,7 @@ def notification_to_public(notification: Notification) -> NotificationOut:
         id=notification.id,
         kind=notification.kind,
         actor=actor,
-        is_anonymous=notification.actor_anonymous or match_notification,
+        is_anonymous=anonymous,
         post_id=notification.post_id,
         comment_id=notification.comment_id,
         same_sky_match_id=notification.same_sky_match_id,
@@ -253,7 +262,7 @@ def list_notifications(
     hidden = hidden_author_ids(db, user.id)
     stmt = (
         select(Notification)
-        .options(joinedload(Notification.actor))
+        .options(joinedload(Notification.actor), joinedload(Notification.post))
         .where(Notification.recipient_id == user.id)
         .order_by(Notification.created_at.desc(), Notification.id.desc())
         .limit(size + 1)
@@ -627,26 +636,47 @@ async def upload_avatar(
     user: User = Depends(current_user),
     file: UploadFile = File(...),
 ):
-    limit(request, "avatar_upload", max_hits=10, window_seconds=3600)
     data = await file.read(MAX_AVATAR_BYTES + 1)
     if len(data) > MAX_AVATAR_BYTES:
-        raise HTTPException(status_code=413, detail="That image is over 2MB.")
+        raise HTTPException(status_code=413, detail="That image is over 8 MB.")
     ext = sniff_image(data)
     if ext is None:
         raise HTTPException(status_code=400, detail="Use a JPG, PNG, or WebP.")
 
-    filename = f"{user.id}.{ext}"
-    for old in AVATAR_DIR.glob(f"{user.id}.*"):
-        if old.name != filename:
-            remove_file(old)
-    target = (AVATAR_DIR / filename).resolve()
-    if AVATAR_DIR.resolve() not in target.parents:
-        raise HTTPException(status_code=400, detail="Could not store that image.")
-    target.write_bytes(data)
-    user.avatar_file = filename
-    db.commit()
-    db.refresh(user)
-    return to_public(user)
+    limit(request, "avatar_upload", max_hits=10, window_seconds=3600, actor_id=str(user.id))
+    user = lock_avatar_owner(db, user.id)
+
+    filename = f"{user.id}.{uuid.uuid4().hex}.{ext}"
+    target = AVATAR_DIR / filename
+    previous = user.avatar_file
+    try:
+        target.write_bytes(data)
+        user.avatar_file = filename
+        profile = to_public(user)
+        db.commit()
+    except Exception:
+        remove_file(target)
+        raise
+
+    remove_avatar_file(profile.id, previous)
+    return profile
+
+
+def lock_avatar_owner(db: Session, user_id: uuid.UUID) -> User:
+    user = db.scalar(
+        select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True)
+    )
+    if user is None:
+        raise HTTPException(status_code=401, detail="Sign in to change your photo.")
+    return user
+
+
+def remove_avatar_file(user_id: uuid.UUID, filename: str | None) -> None:
+    if filename and filename.startswith(f"{user_id}.") and "/" not in filename:
+        try:
+            remove_file(AVATAR_DIR / filename)
+        except OSError:
+            logging.getLogger(__name__).warning("Could not remove the previous avatar", exc_info=True)
 
 
 @app.post("/posts", response_model=PostOut)
@@ -657,6 +687,7 @@ async def create_post(
     mood: str = Form(...),
     is_anonymous: bool = Form(False),
     file: UploadFile | None = File(None),
+    images: list[UploadFile] | None = File(None),
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
@@ -678,25 +709,37 @@ async def create_post(
         is_anonymous=is_anonymous,
     )
 
-    if file is not None:
-        data = await file.read(MAX_POST_IMAGE_BYTES + 1)
+    uploads = ([file] if file is not None else []) + (images or [])
+    if len(uploads) > MAX_POST_IMAGES:
+        raise HTTPException(status_code=422, detail=f"Pick up to {MAX_POST_IMAGES} images.")
+    photos = []
+    for upload in uploads:
+        data = await upload.read(MAX_POST_IMAGE_BYTES + 1)
         if len(data) > MAX_POST_IMAGE_BYTES:
             raise HTTPException(status_code=413, detail="That image is over 2MB.")
         if data:
             ext = sniff_image(data)
             if ext is None:
                 raise HTTPException(status_code=400, detail="Use a JPG, PNG, or WebP.")
-            filename = f"{post.id}.{ext}"
-            target = (POSTS_DIR / filename).resolve()
-            if POSTS_DIR.resolve() not in target.parents:
-                raise HTTPException(status_code=400, detail="Could not store that image.")
-            target.write_bytes(data)
-            post.image_file = filename
+            photos.append((f"{post.id}-{len(photos) + 1}.{ext}", data))
+    if photos:
+        post.image_file = photos[0][0]
+        post.extra_image_files = [filename for filename, _ in photos[1:]]
 
-    db.add(post)
-    db.flush()
-    analyze_new_post_for_matching(db, post, user)
-    db.commit()
+    written = []
+    try:
+        for filename, data in photos:
+            target = POSTS_DIR / filename
+            written.append(target)
+            target.write_bytes(data)
+        db.add(post)
+        db.flush()
+        analyze_new_post_for_matching(db, post, user)
+        db.commit()
+    except Exception:
+        for target in written:
+            remove_file(target)
+        raise
     db.refresh(post)
     return single_post_out(db, post, user)
 
@@ -1080,14 +1123,14 @@ def delete_post(post_id: uuid.UUID, request: Request, db: Session = Depends(get_
     db.execute(delete(Comment).where(Comment.id.in_([item.id for item in comments])))
     db.execute(delete(Reaction).where(Reaction.id.in_([item.id for item in reactions])))
     db.execute(delete(Report).where(Report.id.in_([item.id for item in reports])))
-    image_file = post.image_file
+    image_files = post.image_files
     db.delete(post)
     db.flush()
     if same_sky_profile is not None:
         update_eligibility(db, same_sky_profile)
         invalidate_matches(db, user.id)
     db.commit()
-    if image_file:
+    for image_file in image_files:
         remove_file(POSTS_DIR / image_file)
     return {"ok": True}
 
@@ -1175,7 +1218,6 @@ def list_comments(
         .outerjoin(CommentAnonymousIdentity, (
             (CommentAnonymousIdentity.post_id == Comment.post_id)
             & (CommentAnonymousIdentity.user_id == Comment.author_id)
-            & Comment.is_anonymous
         ))
         .where(Comment.post_id == post_id)
         .order_by(Comment.created_at, Comment.id)
@@ -1228,10 +1270,10 @@ def list_comments(
 
     comments = []
     for root in page:
-        public = comment_to_public(root, viewer_id, aliases)
+        public = comment_to_public(root, viewer_id, aliases, post)
         # Depth-first descendants with parent IDs avoid a nested JSON depth limit.
         public.replies = [
-            comment_to_public(row, viewer_id, aliases, by_id[row.parent_id])
+            comment_to_public(row, viewer_id, aliases, post, by_id[row.parent_id])
             for row in threads[root.id][1:]
         ]
         comments.append(public)
@@ -1295,7 +1337,8 @@ def add_comment(
         ancestor = db.get(Comment, ancestor.parent_id) if ancestor.parent_id else None
 
     aliases = comment_aliases(db, post_id)
-    if body.is_anonymous and user.id not in aliases:
+    anonymous = comment_is_anonymous(post, user.id, body.is_anonymous)
+    if anonymous and user.id not in aliases:
         number = max(aliases.values(), default=0) + 1
         db.add(CommentAnonymousIdentity(post_id=post_id, user_id=user.id, number=number))
         aliases[user.id] = number
@@ -1306,7 +1349,7 @@ def add_comment(
         author_id=user.id,
         parent_id=body.parent_id,
         body=text,
-        is_anonymous=body.is_anonymous,
+        is_anonymous=anonymous,
     )
     db.add(comment)
     recipient_id = parent.author_id if parent is not None else post.author_id
@@ -1321,7 +1364,7 @@ def add_comment(
     )
     db.commit()
     db.refresh(comment)
-    return comment_to_public(comment, user.id, aliases, parent)
+    return comment_to_public(comment, user.id, aliases, post, parent)
 
 
 app.mount("/media", StaticFiles(directory=UPLOAD_DIR), name="media")

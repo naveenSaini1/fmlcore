@@ -2,6 +2,8 @@
 import asyncio
 from contextlib import nullcontext
 from datetime import datetime, timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import AsyncMock, patch
 import uuid
@@ -53,6 +55,55 @@ class ProfileIdentityTests(unittest.TestCase):
     def tearDown(self):
         app.dependency_overrides.clear()
         self.client.close();self.db.close();self.transaction.rollback();self.connection.close()
+
+    def test_avatar_replacements_get_fresh_urls_and_upload_limits_are_per_account(self):
+        app.dependency_overrides[current_user] = lambda: self.viewer
+
+        def upload(data):
+            return self.client.post("/profile/avatar", files={"file": ("photo.png", data, "image/png")})
+
+        png = b"\x89PNG\r\n\x1a\n"
+        with TemporaryDirectory() as directory, patch("app.main.AVATAR_DIR", Path(directory)):
+            first = upload(png + b"first")
+            self.assertEqual(first.status_code, 200, first.text)
+            second = upload(png + b"\0" * 2_100_000)
+            self.assertEqual(second.status_code, 200, second.text)
+            first_name = Path(first.json()["avatar_url"]).name
+            second_name = Path(second.json()["avatar_url"]).name
+            self.assertNotEqual(first_name, second_name)
+            self.assertFalse((Path(directory) / first_name).exists())
+            self.assertEqual((Path(directory) / second_name).stat().st_size, len(png) + 2_100_000)
+
+            self.assertEqual(upload(b"invalid").status_code, 400)
+            self.assertEqual(upload(png + b"\0" * 8_000_000).status_code, 413)
+            for _ in range(8):
+                self.assertEqual(upload(png).status_code, 200)
+            limited = upload(png)
+            self.assertEqual(limited.status_code, 429)
+            self.assertGreater(int(limited.headers["Retry-After"]), 0)
+            self.viewer = self.b
+            self.assertEqual(upload(png).status_code, 200)
+
+    def test_post_gallery_preserves_order_and_deletes_all_files(self):
+        app.dependency_overrides[current_user] = lambda: self.viewer
+        png = b"\x89PNG\r\n\x1a\n"
+        jpg = b"\xff\xd8\xff"
+        fields = {"body": "Gallery photos", "category": "Random Thoughts", "mood": "soft"}
+        with TemporaryDirectory() as directory, patch("app.main.POSTS_DIR", Path(directory)):
+            first = ("images", ("first.png", png, "image/png"))
+            invalid = ("images", ("invalid.jpg", b"invalid", "image/jpeg"))
+            rejected = self.client.post("/posts", data=fields, files=[first, invalid])
+            self.assertEqual(rejected.status_code, 400, rejected.text)
+            self.assertEqual(list(Path(directory).iterdir()), [])
+            second = ("images", ("second.jpg", jpg, "image/jpeg"))
+            response = self.client.post("/posts", data=fields, files=[first, second])
+            self.assertEqual(response.status_code, 200, response.text)
+            post = response.json()
+            self.assertEqual(post["image_url"], post["image_urls"][0])
+            self.assertEqual([(Path(directory) / Path(url).name).read_bytes() for url in post["image_urls"]], [png, jpg])
+            self.assertEqual(self.client.get(f'/posts/{post["id"]}').json()["image_urls"], post["image_urls"])
+            self.assertEqual(self.client.delete(f'/posts/{post["id"]}').status_code, 200)
+            self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_public_profile_excludes_anonymous_private_and_email(self):
         for surface in ('feed','confession'):
@@ -201,6 +252,36 @@ class ProfileIdentityTests(unittest.TestCase):
         self.viewer = self.b
         self.assertEqual(self.client.get(f"/posts/{private.id}").status_code, 200)
 
+    def test_anonymous_post_op_badge_keeps_author_private(self):
+        post = Post(author_id=self.b.id, body="Anonymous story", category="Life", mood="soft", is_anonymous=True)
+        self.db.add(post)
+        self.db.flush()
+        legacy = Comment(post_id=post.id, author_id=self.b.id, body="Old comment", is_anonymous=False)
+        self.db.add(legacy)
+        self.db.flush()
+        app.dependency_overrides[current_user] = lambda: self.viewer
+        path = f"/posts/{post.id}/comments"
+
+        reply = self.client.post(path, json={"body": "Reply to OP", "parent_id": str(legacy.id)}).json()
+        self.assertEqual(reply["reply_to"], "Anonymous")
+        self.viewer = self.b
+        response = self.client.post(path, json={"body": "OP reply", "parent_id": reply["id"], "is_anonymous": False})
+        self.assertEqual(response.status_code, 200, response.text)
+        op_reply = response.json()
+        self.assertTrue(op_reply["is_op"])
+        self.assertTrue(op_reply["is_anonymous"])
+        self.assertIsNone(op_reply["author"])
+        self.assertEqual(op_reply["anonymous_number"], 1)
+
+        self.viewer = self.a
+        root = self.client.get(path).json()["comments"][0]
+        self.assertTrue(root["is_op"])
+        self.assertIsNone(root["author"])
+        self.assertEqual(root["replies"][0]["reply_to"], "Anonymous #1")
+        notifications = self.client.get("/notifications").json()["notifications"]
+        notice = next(item for item in notifications if item["comment_id"] == op_reply["id"])
+        self.assertIsNone(notice["actor"])
+
     def test_comment_conversations_keep_post_scoped_aliases_and_deep_replies(self):
         post = Post(author_id=self.b.id, body="Conversations", category="Life", mood="soft")
         other = Post(author_id=self.b.id, body="Another post", category="Life", mood="soft", surface="confession")
@@ -224,6 +305,11 @@ class ProfileIdentityTests(unittest.TestCase):
         self.assertEqual([row["anonymous_number"] for row in (root, reply, nested, separate)], [1, 2, 1, 2])
         self.assertEqual(nested["reply_to"], "Anonymous #2")
         self.assertEqual(deep["reply_to"], "Anonymous #1")
+        self.assertFalse(root["is_op"])
+        self.assertTrue(reply["is_op"])
+        named_op = add(self.b, other_path, "Named OP reply", anonymous=False)
+        self.assertTrue(named_op["is_op"])
+        self.assertEqual(named_op["author"]["username"], self.b.username)
         self.assertEqual(add(self.b, other_path, "First here")["anonymous_number"], 1)
         self.assertEqual(add(self.a, other_path, "Second here")["anonymous_number"], 2)
         self.assertEqual(self.client.post(other_path, json={"body": "Cross-post reply", "parent_id": nested["id"]}).status_code, 404)

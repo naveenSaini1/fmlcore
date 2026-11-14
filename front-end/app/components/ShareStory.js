@@ -47,10 +47,10 @@ export default function ShareStory({ post, onCount }) {
 
   const label = post.surface === "confession" ? "Share confession" : "Share post";
   return <div className="post-share-action">
-    <button type="button" onClick={share} disabled={sharing} data-shared={shared}
+    <button type="button" onClick={share} disabled={sharing}
       aria-label={`${label} (${post.share_count ?? 0} shares)`} className="post-engagement-button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        {shared ? <path d="m5 12 4 4L19 6" /> : <path d="m22 2-7 20-4-9-9-4L22 2ZM22 2 11 13" />}
+        <path d="m22 2-7 20-4-9-9-4L22 2ZM22 2 11 13" />
       </svg>
       <span aria-hidden="true">{post.share_count ?? 0}</span>
     </button>

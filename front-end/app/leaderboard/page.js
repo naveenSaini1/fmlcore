@@ -1,5 +1,6 @@
 "use client";
 
+import { useErrorToast } from "../components/ErrorToast";
 import { useState } from "react";
 import { useSession } from "../../lib/session";
 import PostCard from "../components/PostCard";
@@ -9,6 +10,7 @@ export default function LeaderboardPage() {
   const { user } = useSession();
   const [limit, setLimit] = useState(5);
   const { entries, nextOffset, loading, error } = useLiveLeaderboard(limit);
+  useErrorToast(error);
   const status = loading ? "loading" : "ready";
 
   return (
@@ -21,7 +23,6 @@ export default function LeaderboardPage() {
         </header>
 
         {loading && entries.length === 0 ? <p className="font-note text-2xl">Counting the votes…</p> : null}
-        {error ? <p className="mb-4 border-4 border-ink bg-coral p-3 font-bold text-on-brand" role="alert">{error}</p> : null}
         {status === "ready" && entries.length === 0 ? (
           <div className="border-4 border-dashed border-ink bg-white p-8 text-center">
             <p className="font-display text-2xl font-extrabold">No votes this week yet.</p>

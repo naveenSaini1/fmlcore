@@ -1,5 +1,6 @@
 "use client";
 
+import { useErrorToast } from "../components/ErrorToast";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "../../lib/api";
@@ -32,6 +33,7 @@ export default function NotificationsPage() {
   const [cursor, setCursor] = useState(null);
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
+  useErrorToast(error);
   const [pending, setPending] = useState(false);
 
   const loadRevision = useRef(0);
@@ -103,7 +105,6 @@ export default function NotificationsPage() {
             {pending ? "Saving…" : "Mark all read"}
           </button>
         </header>
-        {error ? <p className="mb-4 border-4 border-ink bg-coral p-3 font-bold text-on-brand" role="alert">{error}</p> : null}
         {status === "loading" ? <p className="font-note text-2xl">Checking in…</p> : null}
         {status === "ready" && items.length === 0 ? (
           <div className="border-4 border-dashed border-ink bg-white p-8 text-center">

@@ -1,5 +1,6 @@
 "use client";
 
+import { showErrorToast } from "./ErrorToast";
 import { useState } from "react";
 import { reportContent, setBlock, setMute } from "../../lib/api";
 
@@ -17,20 +18,18 @@ export function ReportAction({ targetType, targetId }) {
   const [reason, setReason] = useState("other");
   const [details, setDetails] = useState("");
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
   async function submit(event) {
     event.preventDefault();
     setPending(true);
-    setError("");
     try {
       await reportContent({ targetType, targetId, reason, details });
       setMessage("Report sent. Thanks for looking out.");
       setOpen(false);
       setDetails("");
     } catch (err) {
-      setError(err.message);
+      showErrorToast(err.message);
     } finally {
       setPending(false);
     }
@@ -54,7 +53,6 @@ export function ReportAction({ targetType, targetId }) {
             Details (optional)
             <textarea value={details} onChange={(event) => setDetails(event.target.value.slice(0, 500))} className="mt-1 min-h-16 w-full border-2 border-ink bg-white px-2 py-1.5 text-sm font-semibold" />
           </label>
-          {error ? <p className="text-xs font-bold text-danger" role="alert">{error}</p> : null}
           <button type="submit" disabled={pending} className="border-2 border-ink bg-coral px-3 py-1.5 text-xs font-extrabold text-on-brand disabled:opacity-60">
             {pending ? "Sending…" : "Send report"}
           </button>
@@ -67,12 +65,10 @@ export function ReportAction({ targetType, targetId }) {
 export function UserSafetyActions({ target, onHide }) {
   const [blocked, setBlocked] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
   async function toggle(kind) {
     setPending(true);
-    setError("");
     const wasActive = kind === "block" ? blocked : muted;
     try {
       if (kind === "block") await setBlock(target.id, !wasActive);
@@ -81,7 +77,7 @@ export function UserSafetyActions({ target, onHide }) {
       else setMuted(!wasActive);
       if (!wasActive) onHide?.();
     } catch (err) {
-      setError(err.message);
+      showErrorToast(err.message);
     } finally {
       setPending(false);
     }
@@ -97,7 +93,6 @@ export function UserSafetyActions({ target, onHide }) {
         <button type="button" disabled={pending} onClick={() => toggle("mute")} className="border border-ink px-2 py-1 text-xs font-bold disabled:opacity-60">
           {muted ? "Unmute" : `Mute @${target.username}`}
         </button>
-        {error ? <p className="w-full text-xs font-bold text-danger" role="alert">{error}</p> : null}
       </div>
     </div>
   );

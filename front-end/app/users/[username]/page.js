@@ -1,5 +1,6 @@
 "use client";
 
+import { useErrorToast } from "../../components/ErrorToast";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api, mediaUrl } from "../../../lib/api";
@@ -14,6 +15,7 @@ export default function PublicProfilePage() {
   const [posts, setPosts] = useState([]);
   const [cursor, setCursor] = useState(null);
   const [error, setError] = useState("");
+  useErrorToast(error);
   const [loading, setLoading] = useState(true);
   const [moreLoading, setMoreLoading] = useState(false);
   const key = `${username}:${surface}:${user?.id || "guest"}`;
@@ -50,7 +52,6 @@ export default function PublicProfilePage() {
   }
 
   return <main className="mx-auto max-w-3xl space-y-6 px-4 py-8">
-    {error ? <p role="alert" className="border-2 border-ink bg-paper p-4 font-bold">{error}</p> : null}
     {loading ? <p role="status">Loading profile…</p> : null}
     {profile ? <>
       <header className="border-4 border-ink bg-paper p-6 shadow-[6px_6px_0_var(--color-shadow)]">

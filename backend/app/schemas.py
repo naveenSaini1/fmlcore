@@ -136,6 +136,7 @@ class PostOut(BaseModel):
     category: str
     mood: str
     image_url: str | None
+    image_urls: list[str] = Field(default_factory=list)
     is_anonymous: bool
     surface: str = "feed"
     visibility: str = "public"
@@ -174,6 +175,7 @@ class CommentOut(BaseModel):
     body: str
     is_anonymous: bool
     is_mine: bool = False
+    is_op: bool = False
     author: AuthorOut | None
     parent_id: uuid.UUID | None
     created_at: datetime

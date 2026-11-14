@@ -28,14 +28,15 @@ def post_to_public(
     comment_count: int = 0,
 ) -> PostOut:
     reactions = reactions or {}
-    image_url = f"/media/posts/{post.image_file}" if post.image_file else None
+    image_urls = [f"/media/posts/{filename}" for filename in post.image_files]
     author = None if post.is_anonymous else _author_out(post.author)
     return PostOut(
         id=post.id,
         body=post.body,
         category=post.category,
         mood=post.mood,
-        image_url=image_url,
+        image_url=image_urls[0] if image_urls else None,
+        image_urls=image_urls,
         is_anonymous=post.is_anonymous,
         surface=post.surface,
         visibility=post.visibility,
@@ -51,10 +52,14 @@ def post_to_public(
     )
 
 
-def comment_display_name(comment: Comment, aliases: dict[UUID, int]) -> str:
+def comment_is_anonymous(post: Post, author_id: UUID, is_anonymous: bool) -> bool:
+    return is_anonymous or (post.is_anonymous and author_id == post.author_id)
+
+
+def comment_display_name(comment: Comment, aliases: dict[UUID, int], post: Post) -> str:
     if comment.deleted_at:
         return "Deleted comment"
-    if comment.is_anonymous:
+    if comment_is_anonymous(post, comment.author_id, comment.is_anonymous):
         number = aliases.get(comment.author_id)
         return f"Anonymous #{number}" if number is not None else "Anonymous"
     return f"@{comment.author.username}"
@@ -64,17 +69,20 @@ def comment_to_public(
     comment: Comment,
     viewer_id: UUID | None,
     aliases: dict[UUID, int],
+    post: Post,
     parent: Comment | None = None,
 ) -> CommentOut:
     deleted = comment.deleted_at is not None
+    anonymous = comment_is_anonymous(post, comment.author_id, comment.is_anonymous)
     return CommentOut(
         id=comment.id,
         body="" if deleted else comment.body,
-        is_anonymous=comment.is_anonymous and not deleted,
+        is_anonymous=anonymous and not deleted,
         is_mine=not deleted and comment.author_id == viewer_id,
-        author=None if deleted or comment.is_anonymous else _author_out(comment.author),
-        anonymous_number=aliases.get(comment.author_id) if comment.is_anonymous and not deleted else None,
-        reply_to=comment_display_name(parent, aliases) if parent else None,
+        is_op=not deleted and comment.author_id == post.author_id,
+        author=None if deleted or anonymous else _author_out(comment.author),
+        anonymous_number=aliases.get(comment.author_id) if anonymous and not deleted else None,
+        reply_to=comment_display_name(parent, aliases, post) if parent else None,
         is_deleted=deleted,
         parent_id=comment.parent_id,
         created_at=comment.created_at,

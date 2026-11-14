@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useErrorToast } from "../components/ErrorToast";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createConfession, getConfessions, getRandomConfession, viewConfession } from "../../lib/api";
 import { CATEGORIES, MOODS, moodByKey } from "../../lib/taxonomy";
@@ -28,8 +30,10 @@ function Balloon({ post, index, onPick, selected, onPop, onGone }) {
 }
 
 export default function ConfessionSkyPage() {
+  const router = useRouter();
   const { user, ready: sessionReady } = useSession();
   const [posts, setPosts] = useState([]), [cursor, setCursor] = useState(null), [selected, setSelected] = useState(null), [open, setOpen] = useState(false), [error, setError] = useState(""), [popMessage, setPopMessage] = useState("");
+  useErrorToast(error);
   const [form, setForm] = useState({ body: "", category: "Confessions", mood: "soft", isAnonymous: true, visibility: "public", balloonColor: "pink" });
   const [sending, setSending] = useState(false);
   const loadingCursor = useRef(null);
@@ -78,7 +82,12 @@ export default function ConfessionSkyPage() {
   async function random() { const post = await getRandomConfession(); if (post) setSelected(post); }
   function updateViewed(post) { setPosts((items) => items.map((item) => item.id === post.id ? { ...post, _skySlot: item._skySlot } : item)); setPopMessage(`You popped it · ${post.view_count} views`); window.setTimeout(() => setPopMessage(""), 2600); }
   function removePopped(id) { setPosts((items) => items.filter((item) => item.id !== id)); }
-  async function submit(e) { e.preventDefault(); if (!user) return setError("Log in to release a balloon."); setSending(true); setError(""); try { const post = await createConfession(form); if (post.visibility === "public") { const fallbackSlot = nextSlot.current++ % 8; setPosts((current) => { const [first, ...rest] = current; return [{ ...post, _skySlot: first?._skySlot ?? fallbackSlot }, ...rest, ...(first ? [first] : [])]; }); } setSelected(post); setOpen(false); setForm((f) => ({ ...f, body: "" })); } catch (err) { setError(err.message); } finally { setSending(false); } }
+  function openComposer() {
+    if (user) setOpen(true);
+    else router.push("/login");
+  }
+
+  async function submit(e) { e.preventDefault(); if (!user) return router.push("/login"); setSending(true); setError(""); try { const post = await createConfession(form); if (post.visibility === "public") { const fallbackSlot = nextSlot.current++ % 8; setPosts((current) => { const [first, ...rest] = current; return [{ ...post, _skySlot: first?._skySlot ?? fallbackSlot }, ...rest, ...(first ? [first] : [])]; }); } setSelected(post); setOpen(false); setForm((f) => ({ ...f, body: "" })); } catch (err) { if (err.status === 401) router.push("/login"); else setError(err.message); } finally { setSending(false); } }
   return <>
     <main className="confession-sky">
       <header className="confession-page-header relative mx-auto mb-0 flex max-w-6xl flex-wrap items-center justify-between gap-4 border-4 border-ink bg-coral px-5 py-5 text-on-brand shadow-[7px_7px_0_var(--color-shadow)]">
@@ -86,9 +95,9 @@ export default function ConfessionSkyPage() {
           <p className="font-note text-3xl leading-none">Some things are easier to tell strangers.</p>
           <h1 className="mt-2 font-display text-4xl font-extrabold leading-none sm:text-5xl">The Confession Sky</h1>
         </div>
-        <button onClick={() => setOpen(true)} className="release">+ Release a balloon</button>
+        <button onClick={openComposer} className="release">+ Release a balloon</button>
       </header>
-      <section className="sky-layout"><div className="sky-canvas" aria-label="Floating public confessions">{visible.map((p, i) => <Balloon key={p.id} post={p} index={p._skySlot ?? i} selected={selected?.id === p.id} onPick={setSelected} onPop={updateViewed} onGone={removePopped} />)}{!visible.length && !error ? <><div className="empty-balloons" aria-hidden>{EMPTY_SKY.map((color, i) => <Balloon key={color} index={i} post={{ balloon_color: color, category: "NEW", _skySlot: i }} onPick={() => setOpen(true)} />)}</div></> : null}<button onClick={random} className="sky-random">Find me something random</button></div><aside className="sky-detail">{selected ? <><button onClick={() => setSelected(null)} className="detail-close">× close</button><PostCard post={selected} viewerId={user?.id} /></> : <div className="sky-intro"><span>☁</span><h2>Pick a balloon</h2><p>Every tag holds a thought someone needed to release.</p></div>}</aside></section>{open ? <div className="composer-backdrop"><form onSubmit={submit} className="sky-composer"><button type="button" onClick={() => setOpen(false)} className="detail-close">× close</button><h2>LET IT OUT.</h2><p>What&apos;s been living inside your head?</p><textarea required maxLength="1000" value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="write it down…" /><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{CATEGORIES.map((x) => <option key={x}>{x}</option>)}</select><select value={form.mood} onChange={(e) => setForm({ ...form, mood: e.target.value })}>{MOODS.map((x) => <option key={x.key} value={x.key}>{x.emoji} {x.label}</option>)}</select><div className="color-picks">{COLORS.map((c) => <button type="button" key={c} onClick={() => setForm({ ...form, balloonColor: c })} className={`pick balloon-${c} ${form.balloonColor === c ? "chosen" : ""}`} aria-label={c} />)}</div><label><input type="checkbox" checked={form.isAnonymous} onChange={(e) => setForm({ ...form, isAnonymous: e.target.checked })} /> Stay anonymous</label><label><input type="checkbox" checked={form.visibility === "private"} onChange={(e) => setForm({ ...form, visibility: e.target.checked ? "private" : "public" })} /> Keep private (only you can see it)</label>{error ? <p role="alert">{error}</p> : null}<button disabled={sending} className="release">{sending ? "Releasing…" : "RELEASE MY CONFESSION"}</button></form></div> : null}
+      <section className="sky-layout"><div className="sky-canvas" aria-label="Floating public confessions">{visible.map((p, i) => <Balloon key={p.id} post={p} index={p._skySlot ?? i} selected={selected?.id === p.id} onPick={setSelected} onPop={updateViewed} onGone={removePopped} />)}{!visible.length && !error ? <><div className="empty-balloons" aria-hidden>{EMPTY_SKY.map((color, i) => <Balloon key={color} index={i} post={{ balloon_color: color, category: "NEW", _skySlot: i }} onPick={openComposer} />)}</div></> : null}<button onClick={random} className="sky-random">Find me something random</button></div><aside className="sky-detail">{selected ? <><button onClick={() => setSelected(null)} className="detail-close">× close</button><PostCard post={selected} viewerId={user?.id} /></> : <div className="sky-intro"><span>☁</span><h2>Pick a balloon</h2><p>Every tag holds a thought someone needed to release.</p></div>}</aside></section>{open ? <div className="composer-backdrop"><form onSubmit={submit} className="sky-composer"><button type="button" onClick={() => setOpen(false)} className="detail-close">× close</button><h2>LET IT OUT.</h2><p>What&apos;s been living inside your head?</p><textarea required maxLength="1000" value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="write it down…" /><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{CATEGORIES.map((x) => <option key={x}>{x}</option>)}</select><select value={form.mood} onChange={(e) => setForm({ ...form, mood: e.target.value })}>{MOODS.map((x) => <option key={x.key} value={x.key}>{x.emoji} {x.label}</option>)}</select><div className="color-picks">{COLORS.map((c) => <button type="button" key={c} onClick={() => setForm({ ...form, balloonColor: c })} className={`pick balloon-${c} ${form.balloonColor === c ? "chosen" : ""}`} aria-label={c} />)}</div><label><input type="checkbox" checked={form.isAnonymous} onChange={(e) => setForm({ ...form, isAnonymous: e.target.checked })} /> Stay anonymous</label><label><input type="checkbox" checked={form.visibility === "private"} onChange={(e) => setForm({ ...form, visibility: e.target.checked ? "private" : "public" })} /> Keep private (only you can see it)</label><button disabled={sending} className="release">{sending ? "Releasing…" : "RELEASE MY CONFESSION"}</button></form></div> : null}
     </main>
   </>;
 }

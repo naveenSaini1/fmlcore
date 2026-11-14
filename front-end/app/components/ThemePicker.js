@@ -1,5 +1,6 @@
 "use client";
 
+import { useErrorToast } from "./ErrorToast";
 import { useId } from "react";
 import { THEMES, SYSTEM_THEME, themeByKey } from "../../lib/themes";
 import { useTheme } from "./ThemeProvider";
@@ -9,6 +10,7 @@ const LABELS = { system: "Auto", "acid-lime": "Lime", "electric-purple": "Purple
 export default function ThemePicker() {
   const headingId = useId();
   const { theme, chooseTheme, ready, saving, error } = useTheme();
+  useErrorToast(error);
   return <section className="theme-picker" aria-labelledby={headingId}>
     <h3 id={headingId}>Color theme</h3>
     <p className="theme-picker-description">Set the colors. Keep your favorite layout.</p>
@@ -19,6 +21,5 @@ export default function ThemePicker() {
       </button>)}
     </div>
     <p className="skin-current" role="status">{saving ? "Saving your colors…" : themeByKey(theme).label + " · your colors"}</p>
-    {error && <p className="text-danger" role="alert">{error}</p>}
   </section>;
 }

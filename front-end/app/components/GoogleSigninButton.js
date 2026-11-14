@@ -14,6 +14,7 @@ export default function GoogleSigninButton({ onResult, onError, disabled }) {
   useEffect(() => {
     if (!loaded || !window.google?.accounts?.id) return;
     let alive = true;
+    let observer;
     setFailed(false);
     startGoogleSignin().then(flow => {
       if (!alive || !container.current) return;
@@ -24,10 +25,20 @@ export default function GoogleSigninButton({ onResult, onError, disabled }) {
           catch (error) { if (alive) { callbacks.current.onError(error.message); setFailed(true); } }
         },
       });
-      container.current.replaceChildren();
-      window.google.accounts.id.renderButton(container.current, { type: "standard", theme: "outline", size: "large", text: "continue_with", width: Math.min(360, Math.floor(container.current.clientWidth)) });
+      const target = container.current;
+      let renderedWidth = 0;
+      function render() {
+        const width = Math.min(400, target.clientWidth);
+        if (!width || width === renderedWidth) return;
+        renderedWidth = width;
+        target.replaceChildren();
+        window.google.accounts.id.renderButton(target, { type: "standard", theme: "outline", size: "large", text: "continue_with", width });
+      }
+      render();
+      observer = new ResizeObserver(render);
+      observer.observe(target);
     }).catch(error => { if (alive) { callbacks.current.onError(error.message); setFailed(true); } });
-    return () => { alive = false; };
+    return () => { alive = false; observer?.disconnect(); };
   }, [loaded, retry]);
   return <div className="auth-google" aria-busy={!loaded} style={disabled ? { pointerEvents: "none", opacity: .5 } : undefined}>
     <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" onReady={() => setLoaded(true)} onError={() => { setFailed(true); callbacks.current.onError("Google sign-in couldn't load. Please try again."); }} />

@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useErrorToast } from "./ErrorToast";
 import { useLiveLeaderboard } from "../../lib/useLiveLeaderboard";
 import { profileSticker } from "../../lib/profile-style";
 
 export default function LeaderboardPanel() {
   const { entries, error, loading } = useLiveLeaderboard(5);
+  useErrorToast(error);
 
   return (
     <aside className="community-panel h-fit border-4 border-ink bg-soft-purple p-4 shadow-[6px_6px_0_var(--color-shadow)] md:sticky md:top-24">
@@ -15,7 +17,6 @@ export default function LeaderboardPanel() {
         <p className="leaderboard-description">The stories that hit home.</p>
       </div>
       {loading ? <p className="mt-3 font-note text-lg">Counting the votes…</p> : null}
-      {error ? <p className="mt-3 text-sm font-bold text-danger">{error}</p> : null}
       {!loading && !error && entries.length === 0 ? <p className="mt-3 text-sm font-semibold">No votes this week yet.</p> : null}
       <ol className="leaderboard-list">
         {entries.map((entry) => (

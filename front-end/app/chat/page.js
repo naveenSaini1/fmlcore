@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import ChatIdentityControls from "../components/ChatIdentityControls";
+import { showErrorToast } from "../components/ErrorToast";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
@@ -387,6 +388,7 @@ function ChatContent() {
         refreshConversations();
       } catch (err) {
         console.error("Failed to send message via REST fallback:", err);
+        showErrorToast(err.message || "Couldn't send your message. Try again.");
         setMessages((prev) =>
           prev.map((m) => (m.id === tempId ? { ...m, status: "error" } : m))
         );

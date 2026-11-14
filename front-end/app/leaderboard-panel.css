@@ -22,3 +22,19 @@ html[data-skin] .community-panel .leaderboard-row .leaderboard-excerpt { display
 html[data-skin] .community-panel > .leaderboard-view-all { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin-top: 4px; padding: 10px 0 5px; border: 0; border-top: 1px solid var(--theme-border); border-radius: 0; background: transparent; color: var(--theme-accent); font-size: 12px; font-weight: 600; box-shadow: none; }
 html[data-skin="calm"] .community-panel { border: 3px solid var(--color-ink); border-radius: 0; box-shadow: 5px 5px 0 var(--color-shadow); }
 html[data-skin="frappe"] .community-panel { border-radius: 8px; }
+
+html[data-skin] .explore-page .community-panel { padding: 22px 20px 12px; }
+html[data-skin] .explore-page .leaderboard-eyebrow { font-size: 11px; }
+html[data-skin] .explore-page .community-panel .leaderboard-panel-heading h2 { font-size: 25px; }
+html[data-skin] .explore-page .community-panel .leaderboard-description { font-size: 13px; }
+html[data-skin] .explore-page .leaderboard-entry {
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+}
+html[data-skin] .explore-page .leaderboard-author,
+html[data-skin] .explore-page .community-panel .leaderboard-row .leaderboard-excerpt {
+  font-size: 14px;
+}
+html[data-skin] .explore-page .leaderboard-votes { font-size: 11px; }
+html[data-skin] .explore-page .leaderboard-votes strong { font-size: 16px; }
+html[data-skin] .explore-page .community-panel > .leaderboard-view-all { font-size: 14px; }
