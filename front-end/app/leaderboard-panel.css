@@ -23,7 +23,11 @@ html[data-skin] .community-panel > .leaderboard-view-all { display: flex; align-
 html[data-skin="calm"] .community-panel { border: 3px solid var(--color-ink); border-radius: 0; box-shadow: 5px 5px 0 var(--color-shadow); }
 html[data-skin="frappe"] .community-panel { border-radius: 8px; }
 
-html[data-skin] .explore-page .community-panel { padding: 22px 20px 12px; }
+html[data-skin] .explore-page .community-panel {
+  padding: 22px 20px 12px;
+  background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 24%, transparent) 0.6px, transparent 0.6px);
+  background-size: 7px 7px;
+}
 html[data-skin] .explore-page .leaderboard-eyebrow { font-size: 11px; }
 html[data-skin] .explore-page .community-panel .leaderboard-panel-heading h2 { font-size: 25px; }
 html[data-skin] .explore-page .community-panel .leaderboard-description { font-size: 13px; }
